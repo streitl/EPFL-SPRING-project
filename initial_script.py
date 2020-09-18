@@ -111,7 +111,7 @@ def select_regress_round(X, y, k, M):
     # Round the weights using M
     w_max = np.abs(weights).max()
     assert(w_max > 0)
-    final_weights = (weights * M / w_max).round().tolist()[0]
+    final_weights = (weights * M / w_max).round().astype(int).tolist()[0]
     
     # Combine features and feature weights to output model
     return dict(zip(selected_features, final_weights))
