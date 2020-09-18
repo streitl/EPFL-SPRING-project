@@ -1,11 +1,18 @@
 import pandas as pd
 import sklearn as sk
 import numpy as np
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import log_loss
+
+from statsmodels.regression.linear_model import OLS
+from statsmodels.tools import add_constant
+
+from sklearn.linear_model import LogisticRegressionCV
 
 
 def load_and_process_german():
+    """
+    Loads the data from the german dataset, and processes it by 
+    binning numerical features, and then 1-hot encoding all the features.
+    """
     # Load the data from the csv file
     df = pd.read_csv("data/german.data", sep=" ", header=None)
     
@@ -56,9 +63,14 @@ def load_and_process_german():
 
 def forward_stepwise_regression(X, y, k):
     """
+    Performs forward stepwise regression.
+    Iteratively selects the feature with the lowest AIC score and adds it to the set of features.
+    
     X: DataFrame with the features
     y: DataFrame with the labels
     k: Number of features to be selected
+    
+    Returns a list of k features.
     """
     # The number of features to be selected must be smaller than the number of columns
     assert(k < len(X.columns))
@@ -71,20 +83,15 @@ def forward_stepwise_regression(X, y, k):
     while len(selected_features) < k:
         # Simple initialization to get the best candidate
         best_candidate = None
-        best_score = -1
+        best_score = None
         
-        # Create a logistic regression model,
-        # fit it on the selected features and the current candidate,
-        # compute log loss and compare it to the best
+        # Keep candidate that results in the best AIC score
         for candidate in candidate_features:
-            # Model creation and fitting
-            model = LogisticRegression(penalty="none")
-            model.fit(X[selected_features + [candidate]], y)
+            # Get AIC score
+            regr = OLS(y, add_constant(X[selected_features + [candidate]])).fit()
+            score = regr.aic
             
-            # Log loss of the created model
-            score = log_loss(y, model.predict(X[selected_features + [candidate]]))
-            
-            if score > best_score:
+            if best_candidate is None or score < best_score:
                 best_candidate = candidate
                 best_score = score
         
@@ -97,28 +104,76 @@ def forward_stepwise_regression(X, y, k):
 
 def select_regress_round(X, y, k, M):
     """
+    Trains and returns a select-regress-round model on the data with the given parameters.
+    
+    X: DataFrame with the features
+    y: DataFrame with the labels
     k: Number of features to be selected
     M: Magnitude of the weights
+    
+    Returns a dictionary of feature names into integer weights, a.k.a. the model.
     """
     # Do forward stepwise regression to select only k features
     selected_features = forward_stepwise_regression(X, y, k)
     
     # Train L1-regularized logistic regression model
-    model = LogisticRegression(penalty="l1", solver="saga", C=1000)
+    model = LogisticRegressionCV(cv=5, penalty="l1", Cs=1000, solver="saga")
     model.fit(X[selected_features], y)
-    weights = model.coef_
+    weights = model.coef_[0]
     
     # Round the weights using M
     w_max = np.abs(weights).max()
     assert(w_max > 0)
-    final_weights = (weights * M / w_max).round().astype(int).tolist()[0]
+    final_weights = (weights * M / w_max).round().astype(int).tolist()
     
     # Combine features and feature weights to output model
     return dict(zip(selected_features, final_weights))
+
+
+def predict_srr(model, X):
+    """
+    Computes the model output of each input sample.
+    
+    model: Dictionary of feature names into weights, as returned by select_regress_round
+    X:     DataFrame with the features
+    
+    Returns a numpy array with the binary predictions.
+    """
+    # Initialize a numpy array of zeros with size the number of samples in X
+    n_rows = len(X.index)
+    predictions = np.zeros(n_rows, dtype=int)
+    
+    # Add the weight of each feature
+    for feature in model.keys():
+        predictions += X[feature] * model[feature]
+        
+    # Decision threshold at 0
+    predictions[predictions >= 0] = 1
+    predictions[predictions < 0] = 0
+    
+    return predictions
+
+
+def compute_accuracy(y, y_pred):
+    """
+    Computes the accuracy of the prediction.
+    
+    y:      Target label
+    y_pred: Predicted label
+    
+    Returns float between 0 and 1 corresponding to the accuracy.
+    """
+    return (y == y_pred).astype(int).mean()
 
 
 X, y = load_and_process_german()
 
 model = select_regress_round(X, y, k=5, M=10)
 
-print(model)
+print("Resulting model:", model)
+
+y_pred = predict_srr(model, X)
+
+accuracy = compute_accuracy(y, predict_srr(model, X))
+
+print("Training accuracy:", accuracy)
