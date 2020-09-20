@@ -6,15 +6,21 @@ from statsmodels.regression.linear_model import OLS
 from statsmodels.tools import add_constant
 
 from sklearn.linear_model import LogisticRegressionCV
+from sklearn.metrics import accuracy_score
 
 
 def load_and_process_german():
     """
     Loads the data from the german dataset, and processes it by 
     binning numerical features, and then 1-hot encoding all the features.
+    
+    Returns X, the dataframe with boolean features only, including a constant bias,
+    and y, the dataframe with the class label.
     """
     # Load the data from the csv file
     df = pd.read_csv("data/german.data", sep=" ", header=None)
+    # Make indices start at 1 for R compatibility
+    df.index += 1
     
     # The last column is the label
     df = df.rename(columns={20: "y"})
@@ -22,15 +28,16 @@ def load_and_process_german():
     # We want 0 to be the label "bad" and 1 to be "good"
     df.y = 2 - df.y
     
-    # Bin some numerical features into 5 quantiles
+    # Divide some of the numerical features into bins
     features_to_bin = [1, 4, 12]
     for idx in features_to_bin:
-        df[idx] = pd.qcut(df[idx], q=5, duplicates="drop")
+        df[idx] = pd.qcut(df[idx], q=3)
     
     
-    # One-hot encode all the categorical features except the label y
+    # Create the dataframe of features
     X = pd.DataFrame()
     
+    # One-hot encode all the categorical features except the label y
     for col in df.columns:
         # Don't add label to X
         if col == "y":
@@ -51,10 +58,13 @@ def load_and_process_german():
             if c.startswith("A") and "_" not in c:
                 new_name = c[:-1] + "_" + c[-1:]
                 one_hot_df = one_hot_df.rename(columns={c: new_name})
-                
+        
         # Append each boolean feature to the final data set (at the end)
         for c in one_hot_df.columns:                
             X.insert(loc=len(X.columns), column=c, value=one_hot_df[c])
+    
+    # Group boolean attributes corresponding to the same original column together
+    X.columns = pd.MultiIndex.from_tuples([c.split("_") for c in X.columns])
     
     y = df.y
     
@@ -76,7 +86,7 @@ def forward_stepwise_regression(X, y, k):
     assert(k < len(X.columns))
     
     # We keep track of all features already added to the model and all that can be added
-    candidate_features = list(X.columns)
+    candidate_features = list(X.columns.levels[0])
     selected_features = []
     
     # Only stop when we have k features
@@ -85,7 +95,7 @@ def forward_stepwise_regression(X, y, k):
         best_candidate = None
         best_score = None
         
-        # Keep candidate that results in the best AIC score
+        # Keep candidate that results in the best (smallest) AIC score
         for candidate in candidate_features:
             # Get AIC score
             regr = OLS(y, add_constant(X[selected_features + [candidate]])).fit()
@@ -102,7 +112,99 @@ def forward_stepwise_regression(X, y, k):
     return selected_features
 
 
-def select_regress_round(X, y, k, M):
+class SRR():
+    """
+    Wrapper class for a select-regress-round model.
+    
+    It contains the attributes:
+    - weights, a dictionary of feature name to integer weight
+    - threshold, the float decision threshold
+    
+    
+    """
+    
+    def __init__(self, feature_names, logistic_model, k, M):
+        """
+        Constructs a select-regress-round model with the given parameters.
+        
+        feature_names : List containing the name of the features that the model uses
+        logistic_model: Trained scikit-learn logistic regression model with lasso regularization
+        k             : Number of features used in the model
+        M             : Amplitude of the weights
+        """
+        # Keep this information to show later
+        self.k = k
+        self.M = M
+        
+        # Extract the weight and bias from the logistic model
+        feature_weights = logistic_model.coef_[0]
+        bias = logistic_model.intercept_.item()
+        
+        # Rescale and round the weights
+        w_max = np.abs(feature_weights).max()
+        rounded_weights = (feature_weights * M / w_max).round().astype(int).tolist()
+        
+        # Store the model parameters
+        self.weights = dict(zip(feature_names, rounded_weights))
+        self.threshold = np.ceil(-bias)
+    
+    
+    def predict(self, X):
+        """
+        Predicts the label of each input sample.
+
+        X: DataFrame with the input samples
+
+        Returns a numpy array with the binary predictions.
+        """
+        # Initialize a numpy array of zeros with size the number of samples in X
+        n_rows = len(X.index)
+        predictions = np.zeros(n_rows, dtype=int)
+
+        # Add the weight of each feature
+        for feature, weight in self.weights.items():
+            predictions += X[feature] * weight
+
+        # Decision threshold
+        predictions[predictions >= self.threshold] = 1
+        predictions[predictions < 0] = 0
+
+        return predictions
+    
+    
+    def show_accuracy(self, X, y):
+        """
+        Computes the model prediction and prints its accuracy, along with the baseline.
+        
+        X: DataFrame with the features
+        y: DataFrame with the labels
+        """
+        # Model prediction and accuracy
+        y_pred = self.predict(X)
+        accuracy = (y == y_pred).astype(int).mean()
+        
+        # The baseline is the proportion of the largest class
+        baseline = max(1 - y.mean(), y.mean())
+        
+        print("Training accuracy of %.2f (baseline %.2f)" % (accuracy, baseline))
+    
+
+    def __str__(self):
+        """
+        Returns the string representation of the model, including the weights and decision threshold.
+        """
+        # We create a dataframe for pretty printing
+        mux = pd.MultiIndex.from_tuples(self.weights.keys(), names=["Attribute", "Category"])
+        df = pd.DataFrame(self.weights.values(), index=mux, columns=["Weights"])
+
+        s = "SRR model with k=%d and M=%d:" % (self.k, self.M)
+        s += "\n\n%s\n\n" % (df.to_string())
+        s += "Predict class 1 if sum >= %d, and 0 otherwise." % (self.threshold)
+        
+        return s
+
+
+def select_regress_round(X, y, k, M, verbose=False):
     """
     Trains and returns a select-regress-round model on the data with the given parameters.
     
@@ -111,69 +213,33 @@ def select_regress_round(X, y, k, M):
     k: Number of features to be selected
     M: Magnitude of the weights
     
-    Returns a dictionary of feature names into integer weights, a.k.a. the model.
+    Returns an object of class SRR.
     """
     # Do forward stepwise regression to select only k features
+    if verbose: print("Selecting %d features..." % k)
     selected_features = forward_stepwise_regression(X, y, k)
+    if verbose: print("Selected features", selected_features, "\n")
     
     # Train L1-regularized logistic regression model
-    model = LogisticRegressionCV(cv=5, penalty="l1", Cs=1000, solver="saga")
-    model.fit(X[selected_features], y)
-    weights = model.coef_[0]
+    if verbose: print("Running cross-validation for logistic regression...")
+    clf = LogisticRegressionCV(cv=5, penalty="l1", Cs=1000, solver="saga")
+    clf.fit(X[selected_features], y)
+    accuracy = accuracy_score(y, clf.predict(X[selected_features]))
+    if verbose: print("Logistic regression training accuracy: %.2f" % (accuracy))
     
-    # Round the weights using M
-    w_max = np.abs(weights).max()
-    assert(w_max > 0)
-    final_weights = (weights * M / w_max).round().astype(int).tolist()
+    # Construct the model
+    srr_model = SRR(feature_names=X[selected_features],
+                     logistic_model=clf,
+                     k=k,
+                     M=M)
     
-    # Combine features and feature weights to output model
-    return dict(zip(selected_features, final_weights))
-
-
-def predict_srr(model, X):
-    """
-    Computes the model output of each input sample.
-    
-    model: Dictionary of feature names into weights, as returned by select_regress_round
-    X:     DataFrame with the features
-    
-    Returns a numpy array with the binary predictions.
-    """
-    # Initialize a numpy array of zeros with size the number of samples in X
-    n_rows = len(X.index)
-    predictions = np.zeros(n_rows, dtype=int)
-    
-    # Add the weight of each feature
-    for feature in model.keys():
-        predictions += X[feature] * model[feature]
-        
-    # Decision threshold at 0
-    predictions[predictions >= 0] = 1
-    predictions[predictions < 0] = 0
-    
-    return predictions
-
-
-def compute_accuracy(y, y_pred):
-    """
-    Computes the accuracy of the prediction.
-    
-    y:      Target label
-    y_pred: Predicted label
-    
-    Returns float between 0 and 1 corresponding to the accuracy.
-    """
-    return (y == y_pred).astype(int).mean()
+    return srr_model
 
 
 X, y = load_and_process_german()
 
-model = select_regress_round(X, y, k=5, M=10)
+model = select_regress_round(X, y, k=5, M=3, verbose=True)
 
-print("Resulting model:", model)
+model.show_accuracy(X, y)
 
-y_pred = predict_srr(model, X)
-
-accuracy = compute_accuracy(y, predict_srr(model, X))
-
-print("Training accuracy:", accuracy)
+print(model)
