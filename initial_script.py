@@ -39,6 +39,8 @@ class SRR():
                                index=r_res.rx2('rownames'),
                                columns=pd.to_numeric(r_res.rx2('colnames')),
                                dtype=int)
+        
+        self.threshold = int(np.ceil(r_res.rx2('intercept')).item())
     
     def predict(self, x, M=3):
         """
@@ -48,10 +50,15 @@ class SRR():
         
         TODO add a threshold here somehow to have a binary prediction vector.
         """
+        # Sum relevant coefficients
         preds = pd.Series(np.zeros(len(x.index)), dtype=int)
         for col in x.columns:
             if col in self.df.index:
                 preds += self.df.loc[col][M] * x[col]
+        
+        # Apply decision threshold
+        preds[preds >= self.threshold] = 1
+        preds[preds < self.threshold] = 0
         
         return preds
     
@@ -78,12 +85,10 @@ test = pd.get_dummies(r_res.rx2('test_data'), prefix_sep='').reset_index()
 train_preds = model.predict(train, M=5)
 test_preds = model.predict(test, M=5)
 # TODO replace 0 by baseline
-train_acc = accuracy(train_preds >= 0, train.label)
-test_acc = accuracy(test_preds >= 0, test.label)
+train_acc = accuracy(train_preds, train.label)
+test_acc = accuracy(test_preds, test.label)
 
 # Show results
 baseline = pd.concat([train.label, test.label]).mean()
 print("SRR model with training accuracy %.1f %% and test accuracy %.1f %% (baseline %.1f %%)" % (train_acc * 100, test_acc * 100, baseline * 100))
-
-
 

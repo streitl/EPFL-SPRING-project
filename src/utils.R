@@ -360,11 +360,14 @@ train_srr <- function(dataname, k, n_bins = 3, test_fold = 1) {
   k_model <- get_k_feat_model_from_formula(srr_formula,
                                            disc_train_df, train_labels, k)
   
+  # Create a result object with all the information we need in python
   res <- {}
   res$train_data <- disc_train_df
   res$test_data <- disc_test_df
   res$values <- k_model$round
   res$rownames <- rownames(res$values)
   res$colnames <- colnames(res$values)
+  res$intercept <- coef(k_model$model, s = "lambda.min")["(Intercept)", ]
+  
   return(res)
 }
