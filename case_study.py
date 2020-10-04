@@ -39,4 +39,5 @@ M = 5
 train_acc = accuracy_score(y_train, model.predict(X_train, M)) * 100
 test_acc = accuracy_score(y_test, model.predict(X_test, M)) * 100
 baseline = np.concatenate([y_train, y_test]).mean() * 100
-print("With M=%d, training accuracy of %.1f %% and test accuracy of %.1f %% (baseline %.1f %%)" % (M, train_acc, test_acc, baseline)) 
+print("With M=%d, training accuracy of %.1f %% and test accuracy of %.1f %% (baseline %.1f %%)" % (M, train_acc, test_acc, baseline))
+
