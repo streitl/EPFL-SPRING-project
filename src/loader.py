@@ -1,5 +1,9 @@
 import pandas as pd
 
+from sklearn.model_selection import train_test_split
+
+from .preprocessing import clean, bin_features, one_hot_encode
+
 
 def load_dataset(name):
     """
@@ -183,4 +187,34 @@ def load_dataset(name):
     y = df['label']
     
     return X, y
+
+
+def load_and_process(name, seed=100):
+    """
+    Applies the whole loading and processing pipeline.
+    
+    Arguments:
+    - name: Name of the dataset to process, without the '.csv' extension
+    - seed: Random seed to be used when splitting the data intro train and test
+    
+    Returns:
+    - X_train: DataFrame with the train features, cleaned and processed
+    - X_test:  DataFrame with the test features, cleaned and processed
+    - y_train: DataFrame with the train labels, values are only 0 and 1
+    - y_test:  DataFrame with the test labels, values are only 0 and 1
+    """
+    
+    X, y = load_dataset(name)
+    
+    X = clean(X)
+    
+    X_train, X_test = train_test_split(X, train_size=0.9, random_state=seed)
+    y_train, y_test = train_test_split(y, train_size=0.9, random_state=seed)
+
+    X_train, X_test = bin_features(X_train, X_test, nbins=3)
+
+    X_train = one_hot_encode(X_train)
+    X_test = one_hot_encode(X_test)
+    
+    return X_train, X_test, y_train, y_test
 

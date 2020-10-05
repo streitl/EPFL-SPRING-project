@@ -46,7 +46,7 @@ for dataname in datasets:
     test_acc = accuracy_score(y_test, model.predict(X_test, M)) * 100
     baseline = np.concatenate([y_train, y_test]).mean() * 100
     baseline = max(baseline, 100 - baseline)
-    print("With M=%d, training accuracy of %.1f %% and test accuracy of %.1f %% (baseline %.1f %%)\n" % (M, train_acc, test_acc, baseline))
+    print("Training accuracy of %.1f %% and test accuracy of %.1f %% (baseline %.1f %%)\n" % (train_acc, test_acc, baseline))
     
     results = results.append(
         {'dataset': dataname, 

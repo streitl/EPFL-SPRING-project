@@ -2,6 +2,35 @@ import pandas as pd
 import numpy as np
 
 
+def clean(X):
+    """
+    Does some pre-processing cleaning to the dataset.
+    Includes dropping columns with no information, and converting numerical
+    columns to their rightful datatype when there are missing values.
+    
+    Arguments:
+    - X: DataFrame to clean
+    
+    Returns:
+    - X_new: The cleaned version of the original DataFrame
+    """
+    X_new = X.copy()
+    
+    for col in X.columns:
+        # Drop columns that are useless
+        if len(X[col].unique()) == 1:
+            X_new.drop(columns=col, inplace=True)
+        # Try to change missing values into NaNs to get numerical columns
+        elif '?' in set(X[col]):
+            # Maybe the column is numerical once the '?' are removed
+            try:
+                temp = X[col].replace('?', np.nan).astype(float)
+                X_new[col] = X[col].replace('?', np.nan).astype(float)
+            except:
+                pass
+    return X_new
+
+
 def bin_features(X_train, X_test, nbins):
     """
     Bins the numerical features of the input DataFrames, by first defining quantiles
@@ -26,7 +55,7 @@ def bin_features(X_train, X_test, nbins):
             continue
             
         # Define the bins using X_train only
-        breaks = train[col].quantile([i/nbins for i in range(1, nbins)]).unique().tolist()
+        breaks = train[col].dropna().quantile([i/nbins for i in range(1, nbins)]).unique().tolist()
         breaks = [float("-inf")] + breaks + [float("inf")]
         
         # Use the bins to bin X_train and X_test
@@ -51,7 +80,7 @@ def one_hot_encode(df, sep='~'):
     Returns:
     - new_df: DataFrame with a MultiIndex column index, containing only binary features
     """
-    new_df = pd.get_dummies(df, prefix_sep=sep)
+    new_df = pd.get_dummies(df, prefix_sep=sep, dummy_na=True)
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
     return new_df
 
