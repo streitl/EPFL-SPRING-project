@@ -13,16 +13,17 @@ class SRR(BaseEstimator, ClassifierMixin):
     An sklearn BaseEstimator implementing the Select-Regress-Round model.
     """
     
-    def __init__(self, k, Ms, cv=5, Cs=1000, n_jobs=-1):
+    def __init__(self, k, Ms, cv=5, Cs=1000, n_jobs=-1, max_iter=150):
         """
         The SRR class constructor.
         
         Arguments:
-        - k:      # of features to be used in the model
-        - Ms:     List with the possible M values that the model will use
-        - cv:     # of cross-validation folds to perform when training the logistic regression model
-        - Cs:     # of regularization values to try for the logistic regression model
-        - n_jobs: # of jobs that can run in parallel during cross validation
+        - k:        # of features to be used in the model
+        - Ms:       List with the possible M values that the model will use
+        - cv:       # of cross-validation folds to perform when training the logistic regression model
+        - Cs:       # of regularization values to try for the logistic regression model
+        - n_jobs:   # of jobs that can run in parallel during cross validation
+        - max_iter: # of iterations for the logistic regression model optimization
         """
         assert k > 0, "k must be positive"
         assert int(k) == k, "k must be an integer"
@@ -37,6 +38,7 @@ class SRR(BaseEstimator, ClassifierMixin):
         self.cv = cv
         self.Cs = Cs
         self.n_jobs = n_jobs
+        self.max_iter = max_iter
     
     
     def fit(self, X, y, verbose=False):
@@ -65,7 +67,8 @@ class SRR(BaseEstimator, ClassifierMixin):
             cv=self.cv, penalty="l1", 
             Cs=self.Cs, solver="saga", 
             fit_intercept=True,
-            n_jobs=self.n_jobs
+            n_jobs=self.n_jobs,
+            max_iter=self.max_iter
         )
         
         if verbose: print("Cross-validating the logistic regression model...")

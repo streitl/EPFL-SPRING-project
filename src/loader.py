@@ -16,6 +16,7 @@ def load_dataset(name):
     targets = {
         'adult':           " >50K",
         'annealing':       "3",
+        'audiology-std':   1,
         'bank':            "yes",
         'bankruptcy':      "B",
         'car':             "unacc",
@@ -50,6 +51,18 @@ def load_dataset(name):
                 "exptl", "ferro", "corr", "blue", "lustre", "jurofm", "s", "p",
                 "shape", "thick", "width", "len", "oil", "bore", "packing",
                 "label"],
+        'audiology-std':
+                ["label", "age_gt_60", "air", "airBoneGap", "ar_c", "ar_u",
+                "boneAbnormal", "history_dizziness", "history_fluctuating",
+                "history_nausea", "history_noise", "history_recruitment",
+                "history_ringing", "history_roaring", "history_vomiting",
+                "late_wave_poor", "m_m_gt_2k", "m_m_sn", "m_m_sn_gt_1k",
+                "m_m_sn_gt_2k", "m_sn_gt_1k", "m_sn_gt_2k", "m_sn_gt_3k",
+                "m_sn_gt_4k", "m_sn_lt_1k", "middle_wave_poor", "mod_sn_gt_2k",
+                "mod_sn_gt_3k", "mod_sn_gt_4k", "mod_sn_gt_500", "notch_4k",
+                "notch_at_4k", "o_ar_c", "o_ar_u", "s_sn_gt_1k", "s_sn_gt_2k",
+                "s_sn_gt_4k", "speech", "static_normal", "tymp", "wave_V_delayed",
+                "waveform_ItoV_prolonged"],
         'bank': 
                 ["age", "job", "marital", "education", "default", "housing",
                 "loan", "contact", "month", "day_of_week", "duration",
@@ -156,19 +169,14 @@ def load_dataset(name):
                 "label", "color"]
     }
     
-    ## Load the data from the csv file
-    
-    # Special case for this dataset, which is already preprocessed
-    if name == 'audiology-std':
-        df = pd.read_csv("data/%s.csv" %(name), sep=",")
-    else:
-        df = pd.read_csv("data/%s.csv" %(name), sep=",", header=None, names=columns[name])
+    # Load the data from the csv file
+    df = pd.read_csv("data/%s.csv" %(name), sep=",", header=None, names=columns[name])
         
-        # We want the target label/s to be 1, and the other/s 0
-        if type(targets[name]) == range:
-            df['label'] = (df['label'].isin(targets[name])).astype(int)
-        else:
-            df['label'] = (df['label'] == targets[name]).astype(int)
+    # We want the target label/s to be 1, and the other/s 0
+    if type(targets[name]) == range:
+        df['label'] = (df['label'].isin(targets[name])).astype(int)
+    else:
+        df['label'] = (df['label'] == targets[name]).astype(int)
     
     # Create the dataframe of features
     X = df.drop(columns=['label'])
