@@ -28,6 +28,7 @@ def clean(X):
                 X_new[col] = X[col].replace('?', np.nan).astype(float)
             except:
                 pass
+    
     return X_new
 
 
@@ -65,6 +66,7 @@ def bin_features(X_train, X_test, nbins):
         # Sometimes a bin is empty, so we remove it
         train[col].cat.remove_unused_categories(inplace=True)
         test[col].cat.remove_unused_categories(inplace=True)
+    
     return train, test
 
 
@@ -80,7 +82,15 @@ def one_hot_encode(df, sep='~'):
     Returns:
     - new_df: DataFrame with a MultiIndex column index, containing only binary features
     """
+    # Construct a multi index where the first level is the original column name,
+    # and the second level is the column value
     new_df = pd.get_dummies(df, prefix_sep=sep, dummy_na=True)
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
+    
+    # Remove columns that have no information
+    for col in new_df.columns:
+        if len(new_df[col].unique()) == 1:
+            new_df.drop(columns=col, inplace=True)
+    
     return new_df
 

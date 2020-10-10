@@ -1,9 +1,7 @@
-#!/home/lua/Anaconda3/envs/spring/bin/python
+#!/usr/bin/env python
 
 import pandas as pd
 import numpy as np
-
-import matplotlib.pyplot as plt
 
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -20,7 +18,7 @@ datasets = ['adult', 'annealing', 'audiology-std', 'bank', 'bankruptcy', 'car',
 
 results = pd.DataFrame(columns=["dataset", "train accuracy", "test accuracy", "baseline"])
 
-for dataname in datasets:
+for dataname in datasets[15:]:
     print("->", dataname, "dataset")
     # Load the data
     X, y = load_dataset(name=dataname)
@@ -37,13 +35,12 @@ for dataname in datasets:
     X_test = one_hot_encode(X_test)
     
     # Construct and train Select-Regress-Round model
-    model = SRR(k=3, Ms=range(1, 6))
+    model = SRR(k=3, M=5)
     model.fit(X_train, y_train, verbose=False)
     
     # Show statistics of the model
-    M = 5
-    train_acc = accuracy_score(y_train, model.predict(X_train, M)) * 100
-    test_acc = accuracy_score(y_test, model.predict(X_test, M)) * 100
+    train_acc = accuracy_score(y_train, model.predict(X_train)) * 100
+    test_acc = accuracy_score(y_test, model.predict(X_test)) * 100
     baseline = np.concatenate([y_train, y_test]).mean() * 100
     baseline = max(baseline, 100 - baseline)
     print("Training accuracy of %.1f %% and test accuracy of %.1f %% (baseline %.1f %%)\n" % (train_acc, test_acc, baseline))

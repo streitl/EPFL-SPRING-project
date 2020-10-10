@@ -1,9 +1,7 @@
-#!/home/lua/Anaconda3/envs/spring/bin/python
+#!/usr/bin/env python
 
 import pandas as pd
 import numpy as np
-
-import matplotlib.pyplot as plt
 
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
@@ -28,16 +26,15 @@ X_train = one_hot_encode(X_train)
 X_test = one_hot_encode(X_test)
 
 # Construct and train Select-Regress-Round model
-model = SRR(k=3, Ms=range(1, 10+1))
+model = SRR(k=3, M=5)
 model.fit(X_train, y_train, verbose=True)
 
 # Show model
 print("SRR model:", model.df, "", sep='\n\n')
 
 # Show statistics of the model
-M = 5
-train_acc = accuracy_score(y_train, model.predict(X_train, M)) * 100
-test_acc = accuracy_score(y_test, model.predict(X_test, M)) * 100
+train_acc = accuracy_score(y_train, model.predict(X_train)) * 100
+test_acc = accuracy_score(y_test, model.predict(X_test)) * 100
 baseline = np.concatenate([y_train, y_test]).mean() * 100
-print("With M=%d, training accuracy of %.1f %% and test accuracy of %.1f %% (baseline %.1f %%)" % (M, train_acc, test_acc, baseline))
+print("With M=%d, training accuracy of %.1f %% and test accuracy of %.1f %% (baseline %.1f %%)" % (model.M, train_acc, test_acc, baseline))
 

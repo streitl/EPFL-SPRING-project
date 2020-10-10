@@ -13,28 +13,31 @@ class SRR(BaseEstimator, ClassifierMixin):
     An sklearn BaseEstimator implementing the Select-Regress-Round model.
     """
     
-    def __init__(self, k, Ms, cv=5, Cs=1000, n_jobs=-1, max_iter=150):
+    def __init__(self, k, M, cv=5, Cs=1000, n_jobs=-1, max_iter=150):
         """
         The SRR class constructor.
         
         Arguments:
-        - k:        # of features to be used in the model
-        - Ms:       List with the possible M values that the model will use
-        - cv:       # of cross-validation folds to perform when training the logistic regression model
-        - Cs:       # of regularization values to try for the logistic regression model
-        - n_jobs:   # of jobs that can run in parallel during cross validation
+        - k       : # of features to be used in the model
+        - M       : Amplitude of the weights of the model
+        - cv      : # of cross-validation folds to perform when training the logistic regression model
+        - Cs      : # of regularization values to try for the logistic regression model
+        - n_jobs  : # of jobs that can run in parallel during cross validation
         - max_iter: # of iterations for the logistic regression model optimization
         """
-        assert k > 0, "k must be positive"
         assert int(k) == k, "k must be an integer"
-        assert len(Ms) > 0, "Ms must have at least one element"
+        assert k > 0, "k must be positive"
+        
+        assert int(M) == M, "M must be an integer"
+        assert M > 0, "M must be positive"
+        assert M <= 10, "M must be reasonably small (10 or less)"
         
         # Calls the parent's constructor, not sure if needed
         super().__init__()
         
         # Store parameters
         self.k = k
-        self.Ms = Ms
+        self.M = M
         self.cv = cv
         self.Cs = Cs
         self.n_jobs = n_jobs
@@ -60,6 +63,9 @@ class SRR(BaseEstimator, ClassifierMixin):
         if verbose: print("Selecting", self.k, "features...")
         selected_features = forward_stepwise_regression(X, y, self.k)
         if verbose: print("Selected features", ', '.join(selected_features))
+        
+        # Store the selected features in the model
+        self.selected_features = selected_features
         
         
         ## Step 2. Train L1-regularized logistic regression model
@@ -91,9 +97,10 @@ class SRR(BaseEstimator, ClassifierMixin):
         self.df.index.names = ["Feature", "Category"]
         self.df.columns.names = ["M"]
         
-        # Rescaling and rounding the weights (including bias)
+        ## Rescaling and rounding the weights (including bias)
         w_max = np.abs(self.df['original']).max()
-        for M in self.Ms:
+        # We do the rounding for multiple M-values since it allows us to have many models in one training
+        for M in range(1, 10+1):
             # It might be that all weights are 0 because of L1-regularization
             if w_max != 0:
                 self.df[M] = pd.Series((self.df['original'] * M / w_max).round(), dtype=int)
@@ -103,20 +110,23 @@ class SRR(BaseEstimator, ClassifierMixin):
         if verbose: print("Done!")
     
     
-    def predict(self, X, M):
+    def predict(self, X, M=None):
         """
         Predicts the label of each input sample.
         
         Arguments:
         - X: DataFrame with the features, one-hot encoded and with a two-level column index
-        - M: Amplitude of the weights, acts as a selector for the corresponding column in the model
+        - M: Amplitude of the weights, acts as a selector for the corresponding column in the model.
+             If None, the value given to the constructor of the model is used.
 
         Returns:
         - prediction: a numpy array with the binary predictions
         """
-        assert M >= 0, "M must be positive"
+        if M is None:
+            M = self.M
         assert int(M) == M, "M must be an integer"
-        assert M in self.Ms
+        assert M > 0, "M must be positive"
+        assert M <= 10, "M must be reasonably small"
         
         # Initialize a numpy array of zeros with size the number of samples in X
         n_rows = len(X.index)

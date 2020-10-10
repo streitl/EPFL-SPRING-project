@@ -1,11 +1,8 @@
-#!/home/lua/Anaconda3/envs/spring/bin/python
+#!/usr/bin/env python
 
 import pandas as pd
 import numpy as np
 
-import matplotlib.pyplot as plt
-
-from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
 from tqdm import tqdm
@@ -24,6 +21,7 @@ def verifies_monotonicity(model):
             if not((N <= A and A <= P) or (N >= A and A >= P)):
                 print("Monotonicity violated for feature", feature)
                 return False
+    
     return True
 
 
@@ -31,10 +29,10 @@ results = []
 
 X, y = load_dataset('bankruptcy')
 
-baseline = y.mean() * 100
-baseline = max(baseline, 100 - baseline)
+passed = 0
+n_tests = 500
 
-for nfold in tqdm(range(500)):
+for nfold in tqdm(range(n_tests)):
     X_train, X_test = train_test_split(X, train_size=0.9, random_state=nfold)
     y_train, y_test = train_test_split(y, train_size=0.9, random_state=nfold)
 
@@ -45,11 +43,8 @@ for nfold in tqdm(range(500)):
 
     model = SRR(k=3, Ms=range(1, 10+1))
     model.fit(X_train, y_train, verbose=False)
-
-    train_acc = accuracy_score(y_train, model.predict(X_train, M=5)) * 100
-    test_acc = accuracy_score(y_test, model.predict(X_test, M=5)) * 100
     
-    results.append(verifies_monotonicity(model))
+    passed += int(verifies_monotonicity(model))
 
-print(np.array(results).sum(), "passed monotonicity check")
+print("%.2f %% passed monotonicity check" % (100 * passed / n_tests))
 

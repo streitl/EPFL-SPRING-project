@@ -102,7 +102,7 @@ def load_dataset(name):
                 "religion", "working", "husbands_occupation", "living_std",
                 "media_exposure", "label"],
         'credit-approval': 
-                ["A" + str(i) for i in range(1, 15)] + ["label"],
+                ["A" + str(i) for i in range(1, 15+1)] + ["label"],
         'ctg': 
                 ["FileName", "Date", "b", "e", "LBE", "LB", "AC", "FM", "UC",
                 "ASTV", "mSTV", "ALTV", "mLTV", "DL", "DS", "DP", "DR", "Width",
@@ -173,8 +173,11 @@ def load_dataset(name):
                 "label", "color"]
     }
     
+    # Make sure that the two dictionaries have the same keys
+    assert columns.keys() == targets.keys(), "something is wrong with columns and targets dictionaries" 
+    
     # Load the data from the csv file
-    df = pd.read_csv("data/%s.csv" %(name), sep=",", header=None, names=columns[name])
+    df = pd.read_csv("data/%s.csv" % name, sep=",", header=None, names=columns[name])
         
     # We want the target label/s to be 1, and the other/s 0
     if type(targets[name]) == range:
@@ -189,13 +192,14 @@ def load_dataset(name):
     return X, y
 
 
-def load_and_process(name, seed=100):
+def load_and_process(name, seed=100, nbins=3):
     """
     Applies the whole loading and processing pipeline.
     
     Arguments:
-    - name: Name of the dataset to process, without the '.csv' extension
-    - seed: Random seed to be used when splitting the data intro train and test
+    - name:  Name of the dataset to process, without the '.csv' extension
+    - seed:  Random seed to be used when splitting the data intro train and test
+    - nbins: Number of bins to partition numerical data into
     
     Returns:
     - X_train: DataFrame with the train features, cleaned and processed
@@ -211,7 +215,7 @@ def load_and_process(name, seed=100):
     X_train, X_test = train_test_split(X, train_size=0.9, random_state=seed)
     y_train, y_test = train_test_split(y, train_size=0.9, random_state=seed)
 
-    X_train, X_test = bin_features(X_train, X_test, nbins=3)
+    X_train, X_test = bin_features(X_train, X_test, nbins=nbins)
 
     X_train = one_hot_encode(X_train)
     X_test = one_hot_encode(X_test)
