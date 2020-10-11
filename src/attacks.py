@@ -60,7 +60,9 @@ def find_adversarial_examples(srr_model, X, y, can_change):
                 potential_adversaries = potential_adversaries.append(deformed)
     
     # Get the model prediction for the adversaries
-    potential_adversaries['label~adversarial'] = srr_model.predict(one_hot_encode(potential_adversaries))
+    potential_adversaries['label~adversarial'] = srr_model.predict(
+        one_hot_encode(potential_adversaries.drop(columns=['label~original']))
+    )
     
     # Only keep those which changed the prediction label
     true_adversaries = potential_adversaries.loc[

@@ -88,9 +88,7 @@ def one_hot_encode(df, sep='~'):
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
     
     # Remove columns that have no information
-    for col in new_df.columns:
-        if len(new_df[col].unique()) == 1:
-            new_df.drop(columns=col, inplace=True)
+    new_df.drop(columns=[col for col in new_df.columns if len(new_df[col].unique()) == 1], inplace=True)
     
     return new_df
 
