@@ -197,15 +197,15 @@ def load_and_process(name, seed=100, nbins=3):
     Applies the whole loading and processing pipeline.
     
     Arguments:
-    - name:  Name of the dataset to process, without the '.csv' extension
-    - seed:  Random seed to be used when splitting the data intro train and test
+    - name : Name of the dataset to process, without the '.csv' extension
+    - seed : Random seed to be used when splitting the data intro train and test
     - nbins: Number of bins to partition numerical data into
     
     Returns:
     - X_train: DataFrame with the train features, cleaned and processed
-    - X_test:  DataFrame with the test features, cleaned and processed
+    - X_test : DataFrame with the test features, cleaned and processed
     - y_train: DataFrame with the train labels, values are only 0 and 1
-    - y_test:  DataFrame with the test labels, values are only 0 and 1
+    - y_test : DataFrame with the test labels, values are only 0 and 1
     """
     
     X, y = load_dataset(name)

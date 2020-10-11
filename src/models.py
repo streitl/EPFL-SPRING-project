@@ -53,8 +53,8 @@ class SRR(BaseEstimator, ClassifierMixin):
         At the end, the trained model is stored and represented in self.df
         
         Arguments:
-        - X: DataFrame with the features, one-hot encoded and with a two-level column index
-        - y: DataFrame with the target
+        - X      : DataFrame with the features, one-hot encoded and with a two-level column index
+        - y      : DataFrame with the target
         - verbose: Boolean value indicating whether to print intermediary results
         """
         assert self.k <= len(X.columns.levels[0]), "the given dataset has less than k features"

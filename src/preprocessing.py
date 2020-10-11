@@ -39,12 +39,12 @@ def bin_features(X_train, X_test, nbins):
     
     Arguments:
     - X_train: DataFrame to be binned, used to compute the quantiles
-    - X_test:  DataFrame to be binned
-    - nbins:   # of bins to be defined
+    - X_test : DataFrame to be binned
+    - nbins  : # of bins to be defined
     
     Returns:
     - train: DataFrame whose numerical features are binned
-    - test:  DataFrame whose numerical features are binned
+    - test : DataFrame whose numerical features are binned
     """
     # Copy the data
     train = X_train.copy()
@@ -76,7 +76,7 @@ def one_hot_encode(df, sep='~'):
     a set of binary features, and grouping them together in a pandas MultiIndex.
     
     Arguments:
-    - df:  DataFrame to one-hot encode
+    - df : DataFrame to one-hot encode
     - sep: String to be used for the construction of the MultiIndex, can't belong to the columns
     
     Returns:
