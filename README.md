@@ -12,8 +12,7 @@ The repository is organised as follows:
   - `preprocessing.py` contains preprocessing methods, namely `processing_pipeline`
 - The folder `data` contains the datasets' `.csv` files:
   - There are 21 UCI datasets (retrieved from the repository of the '_Simple Rules for Complex Decisions_' paper)
-  - Texas dataset
-  - IEEECIS dataset
+  - It is here where you should put the texas and IEEECIS datasets (they are too large)
 
 There are also scripts on the main directory that allow me to verify that I didn't break anything, and also allow to reproduce some results:
 - `adversarial_german.py` trains SRR on `german_credit`, and outputs the adversarial examples that were found
