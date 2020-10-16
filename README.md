@@ -15,7 +15,7 @@ The repository is organised as follows:
   - It is here where you should put the texas and IEEECIS datasets (they are too large)
 
 There are also scripts on the main directory that allow me to verify that I didn't break anything, and also allow to reproduce some results:
-- `adversarial_german.py` trains SRR on `german_credit`, and outputs the adversarial examples that were found
+- `adversaries.py` trains SRR on the given dataset, looks for adversaries by changing only the specified columns, and outputs the adversarial examples that were found
 - `all_uci_datasets.py` trains SRR on all UCI datasets, and outputs performance metrics for each of them
 - `bankruptcy_monotonicity.py` checks whether SRR trained on `bankruptcy` verifies monotonicity, for many train/test splits
 - `case_study.py` imitates `case_study.R` from the repository of the '_Simple Rules for Complex Decisions_' paper
