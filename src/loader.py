@@ -245,8 +245,7 @@ def load_dataset(name):
     elif name == "ieeecis":
         return load_ieeecis()
     elif name not in targets.keys():
-        print(f"Unknown dataset: {name}")
-        exit(1)
+        raise ValueError(f"Unknown dataset: {name}")
     
     # Load the data from the csv file
     df = pd.read_csv(f"{DATA_DIR}/{name}.csv", sep=",",
