@@ -12,14 +12,13 @@ The repository is organised as follows:
   - `preprocessing.py` contains preprocessing methods, namely `processing_pipeline`
 - The folder `data` contains the datasets' `.csv` files:
   - There are 21 UCI datasets (retrieved from the repository of the '_Simple Rules for Complex Decisions_' paper)
-  - Texas dataset
-  - IEEECIS dataset
+  - It is here where you should put the texas and IEEECIS datasets (they are too large)
 
 There are also scripts on the main directory that allow me to verify that I didn't break anything, and also allow to reproduce some results:
-- `adversarial_german.py` trains SRR on `german_credit`, and outputs the adversarial examplez that were found
-- `all_uci_datasets.py` trains SRR on each UCI dataset, and outputs performance metrics for each of them
-- `bankruptcy_monotonicity.py` checks whether SRR trained on `bankruptcy` verifies monotonicity
-- `case_study.py` imitates `case_study.R` from the repository of of the '_Simple Rules for Complex Decisions_' paper
+- `adversarial_german.py` trains SRR on `german_credit`, and outputs the adversarial examples that were found
+- `all_uci_datasets.py` trains SRR on all UCI datasets, and outputs performance metrics for each of them
+- `bankruptcy_monotonicity.py` checks whether SRR trained on `bankruptcy` verifies monotonicity, for many train/test splits
+- `case_study.py` imitates `case_study.R` from the repository of the '_Simple Rules for Complex Decisions_' paper
 
 ## Requirements
 Non-exhaustive list of installed conda packages:
