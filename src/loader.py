@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from sklearn.model_selection import train_test_split
 
@@ -170,6 +171,64 @@ columns = {
 assert columns.keys() == targets.keys(), "something is wrong with columns and targets dictionaries"
 
 
+def load_ieeecis():
+    """
+    Loads IEEE-CIS fraud detection dataset.
+
+    Based on: https://www.kaggle.com/c/ieee-fraud-detection/discussion/101203
+    
+    Also does some preprocessing, like removing version numbers from OS and broswer.
+    
+    Returns:
+    - X: DataFrame with the features
+    - y: DataFrame with the label, values are only 0 and 1
+    """
+    IEECIS_PATH = DATA_DIR + "/ieeecis"
+    
+    ## Loading
+    
+    # Load only identity columns which contain interpretable information:
+    #  - DeviceType is 'mobile'/'desktop'
+    #  - id_30 is the OS
+    #  - id_31 is the browser
+    identity = pd.read_csv(IEECIS_PATH+"/train_identity.csv",
+                           usecols=['TransactionID', 'DeviceType', 'id_30', 'id_31'])
+    
+    # Load only transaction columns which contain interpretable information:
+    #  - TransactionAmt is transaction amount in dollars
+    #  - card4 is the name of card issuing company (visa, etc)
+    #  - card6 is 'debit'/'credit'
+    #  - addr2 identifies the country of purchase
+    #  - dist1 is the distance between purchase and billing addr
+    transaction = pd.read_csv(IEECIS_PATH+"/train_transaction.csv",
+                              usecols=['TransactionID', 'TransactionAmt', 'card4',
+                                       'card6', 'addr2', 'dist1', 'isFraud'],
+                              dtype={'addr2': 'category'})
+    
+    ## Processing
+    # Remove version number from browser info
+    identity.id_31 = identity.id_31.str.replace(' ?[0-9]+(.[0-9]+)?', '')
+    # Also remove the word generic (helps merging some groups)
+    identity.id_31 = identity.id_31.str.replace(' ?generic', '')
+    # Only keep frequent values, turn the other into NaNs
+    id_31_counts = identity.id_31.value_counts()
+    identity.id_31 = identity.id_31.map(lambda i: i if id_31_counts[i] > 200 else np.nan,
+                                        na_action='ignore')
+    
+    # Remove version number from OS info
+    identity.id_30 = identity.id_30.str.replace(' ?[0-9]+([._][0-9]+){0,2}', '')
+    
+    # We need the joined result
+    combined_df = pd.merge(transaction, identity, on="TransactionID", how="left")
+    combined_df.set_index('TransactionID', inplace=True)
+    
+    # Divide into features and label
+    X = combined_df.drop(columns=["isFraud"])
+    y = combined_df['isFraud']
+    
+    return X, y
+
+
 def load_dataset(name):
     """
     Loads the dataset with the given name, and returns two DataFrames with the features and label.
@@ -183,6 +242,11 @@ def load_dataset(name):
     """
     if name == "texas":
         return load_texas()
+    elif name == "ieeecis":
+        return load_ieeecis()
+    elif name not in targets.keys():
+        print(f"Unknown dataset: {name}")
+        exit(1)
     
     # Load the data from the csv file
     df = pd.read_csv(f"{DATA_DIR}/{name}.csv", sep=",",

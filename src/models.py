@@ -81,7 +81,8 @@ class SRR(BaseEstimator, ClassifierMixin):
         logistic_model.fit(X[selected_features], y)
         if verbose:
             acc = accuracy_score(y, logistic_model.predict(X[selected_features])) * 100
-            print("Logistic model accuracy of %.1f %% on the training set." % acc)
+            baseline = max(y.mean(), 1-y.mean()) * 100
+            print("Logistic model accuracy of {:.1f} % on the training set (baseline {:.1f} %".format(acc, baseline))
         
         
         ## Step 3. Retrieve the model weights
