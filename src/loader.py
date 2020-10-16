@@ -171,6 +171,7 @@ columns = {
 assert columns.keys() == targets.keys(), "something is wrong with columns and targets dictionaries"
 
 
+
 def load_ieeecis():
     """
     Loads IEEE-CIS fraud detection dataset.
@@ -186,6 +187,7 @@ def load_ieeecis():
     IEECIS_PATH = DATA_DIR + "/ieeecis"
     
     ## Loading
+    print("Loading ieeecis...")
     
     # Load only identity columns which contain interpretable information:
     #  - DeviceType is 'mobile'/'desktop'
@@ -229,6 +231,52 @@ def load_ieeecis():
     return X, y
 
 
+
+def load_texas():
+    """
+    Loads Texas Hospital Discharge dataset.
+
+    Code is based on a script by Theresa Stadler.
+    """
+    TEXAS_PATH = DATA_DIR + "/texas/PUDF_base1_{}q2013_tab.txt"
+
+    cat_cols = ["TYPE_OF_ADMISSION", "PAT_STATE", "PAT_AGE", "PAT_STATUS",
+                "SEX_CODE", "RACE", "ETHNICITY", "ILLNESS_SEVERITY",
+                "RISK_MORTALITY"]
+    
+    num_cols = ["LENGTH_OF_STAY", "TOTAL_CHARGES", "TOTAL_NON_COV_CHARGES"]
+
+    dtypes = {**{col: "category" for col in cat_cols},
+              **{col: "float" for col in num_cols}}
+    
+    
+    print("Loading texas...")
+    
+    # Read each of the 4 files of the dataset and put them in a list
+    q = [0] * 4
+    for i in range(4):
+        q[i] = pd.read_csv(TEXAS_PATH.format(i+1),
+                           delimiter="\t",
+                           dtype=dtypes,
+                           usecols=cat_cols+num_cols,
+                           na_values=['`'])
+        
+        print(f"Loaded {i+1}/4")
+    
+    # Merge the DataFrames into a single one
+    combined_df = pd.concat(q, ignore_index=True)
+    
+    # Only keep the first 3 digits of zip (padded with zeroes if the original is shorter than 5 digits)
+    # combined_df['PAT_ZIP'] = combined_df['PAT_ZIP'].map(lambda z: z.zfill(5)[:2], na_action='ignore')
+    
+    # We define the label to be whether there were non-covered charges or not
+    X = combined_df.drop(columns='TOTAL_NON_COV_CHARGES')
+    y = (combined_df['TOTAL_NON_COV_CHARGES'] > 0).astype(int)
+    
+    return X, y
+
+
+
 def load_dataset(name):
     """
     Loads the dataset with the given name, and returns two DataFrames with the features and label.
@@ -247,6 +295,8 @@ def load_dataset(name):
     elif name not in targets.keys():
         raise ValueError(f"Unknown dataset: {name}")
     
+    print(f"Loading {name}...")
+        
     # Load the data from the csv file
     df = pd.read_csv(f"{DATA_DIR}/{name}.csv", sep=",",
                      header=None, names=columns[name], na_values=['?'])
