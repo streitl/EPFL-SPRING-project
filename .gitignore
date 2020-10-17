@@ -2,4 +2,5 @@
 *.Rhistory
 */__pycache__
 data/*.csv
+models/*.pkl
 notebooks/*
