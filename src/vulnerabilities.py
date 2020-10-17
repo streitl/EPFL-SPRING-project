@@ -120,6 +120,7 @@ def verifies_monotonicity(model):
                 
                 # If both are true, then monotonicity is not verified for this feature
                 if increased and decreased:
+                    print("Monotonicity check failed for:", model.df.loc[[feature]]['original'], sep='\n')
                     return False
     
     # If no feature broke monotonicity, then the model verifies monotonicity

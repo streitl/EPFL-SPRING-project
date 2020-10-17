@@ -28,6 +28,7 @@ X, y = load_dataset(args.dataset)
 passed = 0
 n_tests = 10
 
+print(f"Verifying monotonicity for {n_tests} different models:")
 for nfold in tqdm(range(n_tests)):
     
     X_train_bin, X_test_bin, y_train, y_test = processing_pipeline(X, y, seed=nfold)
