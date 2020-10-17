@@ -17,6 +17,9 @@ from src.vulnerabilities import verifies_monotonicity
 parser = argparse.ArgumentParser(description='Monotonicity checker')
 
 # Add all required arguments
+parser.add_argument('--k', type=int, nargs='?', default=3,
+                    help='k is the number of features to be selected by the model')
+
 parser.add_argument('dataset', type=str,
                     help='Name of the dataset without the .csv extension')
 
@@ -33,7 +36,7 @@ for nfold in tqdm(range(n_tests)):
     
     X_train_bin, X_test_bin, y_train, y_test = processing_pipeline(X, y, seed=nfold)
 
-    model = SRR(k=3, M=3)
+    model = SRR(k=args.k, M=3)
     model.fit(one_hot_encode(X_train_bin), y_train, verbose=False)
     
     passed += int(verifies_monotonicity(model))
