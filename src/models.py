@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+import pickle
+
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import accuracy_score
@@ -121,7 +123,7 @@ class SRR(BaseEstimator, ClassifierMixin):
              If None, the value given to the constructor of the model is used.
 
         Returns:
-        - prediction: a numpy array with the binary predictions
+        - predictions: Numpy array with the binary predictions
         """
         if M is None:
             M = self.M
@@ -144,4 +146,39 @@ class SRR(BaseEstimator, ClassifierMixin):
         predictions[predictions < 0] = 0
         
         return predictions.astype(int)
-
+    
+    
+    def save(self, dataset_name):
+        """
+        Saves the model into a file using pickle.
+        The file name is a combination of the dataset name, and of the k, M values of the model.
+        
+        Arguments:
+        - dataset_name: String with the name of the dataset that was used to train the model.
+        """
+        model_path = f"models/srr_{dataset_name}_k_{self.k}_M_{self.M}.pkl"
+        with open(model_path, 'wb') as f:
+            pickle.dump(self, f)
+        
+        print(f"Saved SRR model to {model_path}")
+    
+    def load(dataset_name, k, M):
+        """
+        Loads an SRR model with the specified properties.
+        The file name is a combination of the dataset name, and of the k, M values of the model.
+        
+        Arguments:
+        - dataset_name: String with the name of the dataset that was used to train the model that we want to load
+        - k           : The number of features that the wanted model has selected
+        - M           : The amplitude of the weights of the wanted model
+        
+        Returns:
+        - model: The SRR model, loaded from a file
+        """
+        model_path = f"models/srr_{dataset_name}_k_{k}_M_{M}.pkl"
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+            
+        print(f"Loaded SRR model from {model_path}")
+        
+        return model

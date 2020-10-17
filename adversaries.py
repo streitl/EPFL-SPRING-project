@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
-import sys
-
 import pandas as pd
+
+import argparse
 
 from sklearn.model_selection import train_test_split
 
@@ -14,24 +14,34 @@ from src.preprocessing import processing_pipeline, one_hot_encode
 from src.attacks import find_adversarial_examples
 
 
-# Check that the right number of arguments was given
-if len(sys.argv) < 3:
-    raise ValueError("Wrong number of arguments. Usage: ./adversaries.py dataset_name [modifiable_features]")
+# Instantiate the parser
+parser = argparse.ArgumentParser(description='Adversarial examples finder')
 
-# Retrieve dataset name from command line
-dataset_name = sys.argv[1]
-# And the list of features which can be modified
-modifiable_features = sys.argv[2:]
+# Add all required arguments
+parser.add_argument('--k', type=int, nargs='?', default=3,
+                    help='k is the number of features to be selected by the model')
+
+parser.add_argument('--M', type=int, nargs='?', default=3,
+                    help='M is the amplitude of the weights of the model')
+
+parser.add_argument('dataset', type=str,
+                    help='Name of the dataset without the .csv extension')
+
+parser.add_argument('modifiable_features', type=str, nargs ='+',
+                    help='List of feature names to be changed in order to find adversaries')
+
+args = parser.parse_args()
+
 
 # Loading and processing data
-X, y = load_dataset(dataset_name)
+X, y = load_dataset(args.dataset)
     
 # Apply the processing pipeline
 X_train_bin, X_test_bin, y_train, y_test = processing_pipeline(X, y)
 
 
-# To fight class imbalance
-if dataset_name in ['texas', 'ieeecis']:
+# To fight class imbalance on texas and ieeecis
+if args.dataset in ['texas', 'ieeecis']:
     X_train_bin_subset = pd.concat([
         X_train_bin[y_train == 1].sample(n=3000, random_state=15),
         X_train_bin[y_train == 0].sample(n=3000, random_state=15)
@@ -41,17 +51,25 @@ else:
     X_train_bin_subset = X_train_bin
     y_train_subset = y_train
 
-# Fitting model
-model = SRR(k=3, M=3)
-model.fit(one_hot_encode(X_train_bin_subset), y_train_subset, verbose=True)
+
+# Try to load model from disk, and if it doesn't exist train it
+try:
+    model = SRR.load(args.dataset, k=args.k, M=args.M)
+    
+except:
+    # Fit model
+    model = SRR(k=args.k, M=args.M)
+    model.fit(one_hot_encode(X_train_bin_subset), y_train_subset, verbose=True)
+    # Save it to disk
+    model.save(args.dataset)
 
 print("SRR model:", model.df, "", sep="\n\n")
 
 
 # Finding adversarial examples
 adversarial_results = find_adversarial_examples(model, X_train_bin_subset, y_train_subset, 
-                                                can_change=modifiable_features)
+                                                can_change=args.modifiable_features)
 n_adversaries = adversarial_results.shape[0]
-print(f"Found {n_adversaries} adversarial examples for {dataset_name} by changing only {modifiable_features}:\n")
+print(f"Found {n_adversaries} adversarial examples for {args.dataset} by changing only {args.modifiable_features}:\n")
 print(adversarial_results)
 

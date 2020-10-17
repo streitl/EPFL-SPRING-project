@@ -44,7 +44,7 @@ def find_adversarial_examples(srr_model, X, y, can_change):
     
     
     ## Construct a list of potential adversarial examples by deforming each correctly classified sample
-    potential_adversaries = pd.DataFrame()
+    potential_adversaries = pd.DataFrame(columns=correctly_classified.columns)
     
     # Iterate over correctly classified points
     for index, data in tqdm(correctly_classified.iterrows(), total=correctly_classified.shape[0]):
