@@ -20,6 +20,9 @@ parser = argparse.ArgumentParser(description='Monotonicity checker')
 parser.add_argument('--k', type=int, nargs='?', default=3,
                     help='k is the number of features to be selected by the model')
 
+parser.add_argument('--ntests', type=int, nargs='?', default=10,
+                    help='The number of tests to do, so the number of models to train')
+
 parser.add_argument('dataset', type=str,
                     help='Name of the dataset without the .csv extension')
 
@@ -29,10 +32,9 @@ args = parser.parse_args()
 X, y = load_dataset(args.dataset)
 
 passed = 0
-n_tests = 10
 
-print(f"Verifying monotonicity for {n_tests} different models:")
-for nfold in tqdm(range(n_tests)):
+print(f"Verifying monotonicity for {args.ntests} different models:")
+for nfold in tqdm(range(args.ntests)):
     
     X_train_bin, X_test_bin, y_train, y_test = processing_pipeline(X, y, seed=nfold)
 
@@ -41,5 +43,5 @@ for nfold in tqdm(range(n_tests)):
     
     passed += int(verifies_monotonicity(model))
 
-print("{}: {:.1f} % passed monotonicity check".format(args.dataset, 100 * passed / n_tests))
+print("{}: {:.1f} % passed monotonicity check".format(args.dataset, 100 * passed / args.ntests))
 
