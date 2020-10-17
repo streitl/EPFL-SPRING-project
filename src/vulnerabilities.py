@@ -106,7 +106,7 @@ def verifies_monotonicity(model):
             non_na_categories = categories[categories != 'nan']
             
             # Retrieve original weights of the model (as a Series)
-            weights = model.df.loc[feature].loc[non_na_categories, 'original']
+            weights = model.df.loc[feature].loc[non_na_categories, model.M]
             
             # Indicators of whether the weights have already increased/decreased so far
             increased, decreased = False, False
@@ -120,7 +120,7 @@ def verifies_monotonicity(model):
                 
                 # If both are true, then monotonicity is not verified for this feature
                 if increased and decreased:
-                    print("Monotonicity check failed for:", model.df.loc[[feature]]['original'], sep='\n')
+                    print("Monotonicity check failed for:", model.df.loc[[feature]][model.M], sep='\n')
                     return False
     
     # If no feature broke monotonicity, then the model verifies monotonicity

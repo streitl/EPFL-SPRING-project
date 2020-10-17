@@ -20,6 +20,9 @@ parser = argparse.ArgumentParser(description='Monotonicity checker')
 parser.add_argument('--k', type=int, nargs='?', default=3,
                     help='k is the number of features to be selected by the model')
 
+parser.add_argument('--M', type=int, nargs='?', default=3,
+                    help='M is the amplitude of the weights of the model')
+
 parser.add_argument('--ntests', type=int, nargs='?', default=10,
                     help='The number of tests to do, so the number of models to train')
 
@@ -38,7 +41,7 @@ for nfold in tqdm(range(args.ntests)):
     
     X_train_bin, X_test_bin, y_train, y_test = processing_pipeline(X, y, seed=nfold)
 
-    model = SRR(k=args.k, M=3)
+    model = SRR(k=args.k, M=args.M)
     model.fit(one_hot_encode(X_train_bin), y_train, verbose=False)
     
     passed += int(verifies_monotonicity(model))
