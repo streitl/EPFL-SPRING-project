@@ -162,6 +162,7 @@ class SRR(BaseEstimator, ClassifierMixin):
         
         print(f"Saved SRR model to {model_path}")
     
+    
     def load(dataset_name, k, M):
         """
         Loads an SRR model with the specified properties.
@@ -182,3 +183,4 @@ class SRR(BaseEstimator, ClassifierMixin):
         print(f"Loaded SRR model from {model_path}")
         
         return model
+

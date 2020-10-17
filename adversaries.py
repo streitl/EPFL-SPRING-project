@@ -4,14 +4,12 @@ import pandas as pd
 
 import argparse
 
-from sklearn.model_selection import train_test_split
-
 from tqdm import tqdm
 
 from src.loader import load_dataset
 from src.models import SRR
 from src.preprocessing import processing_pipeline, one_hot_encode
-from src.attacks import find_adversarial_examples
+from src.vulnerabilities import find_adversarial_examples
 
 
 # Instantiate the parser

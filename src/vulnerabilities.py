@@ -79,4 +79,49 @@ def find_adversarial_examples(srr_model, X, y, can_change):
     
     # Sort the column names to get a more compact view
     return adversaries_and_originals.reindex(sorted(adversaries_and_originals.columns), axis=1)
+
+
+
+def verifies_monotonicity(model):
+    """
+    Takes a trained SRR model, and for each selected feature whose categories are intervals (and possibly nan),
+    checks that the weights corresponding to the intervals are either in increasing or decreasing order.
     
+    Arguments:
+    - model: Trained SRR model
+    
+    Returns:
+    - Boolean indicating whether the model verifies monotonicity
+    """
+    # Iterate over all features that the model uses
+    for feature in model.df.index.levels[0]:
+        
+        # Retrieve the categories corresponding to this feature
+        categories = model.df.loc[feature].index
+        
+        # Intervals are of the form (left, right]
+        if categories.str.startswith("(").any():
+            
+            # Keep only non-na categories
+            non_na_categories = categories[categories != 'nan']
+            
+            # Retrieve original weights of the model (as a Series)
+            weights = model.df.loc[feature].loc[non_na_categories, 'original']
+            
+            # Indicators of whether the weights have already increased/decreased so far
+            increased, decreased = False, False
+            
+            # Go trough pairs of current and previous weights
+            for current, previous in zip(weights.iloc[1:], weights):
+                if current > previous:
+                    increased = True
+                elif current < previous:
+                    decreased = True
+                
+                # If both are true, then monotonicity is not verified for this feature
+                if increased and decreased:
+                    return False
+    
+    # If no feature broke monotonicity, then the model verifies monotonicity
+    return True
+

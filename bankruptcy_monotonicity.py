@@ -3,8 +3,6 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.model_selection import train_test_split
-
 from tqdm import tqdm
 
 from src.loader import load_dataset
@@ -12,7 +10,7 @@ from src.models import SRR
 from src.preprocessing import processing_pipeline, one_hot_encode
 
 
-def verifies_monotonicity(model):
+def bankruptcy_verifies_monotonicity(model):
     for feature in model.df.index.levels[0]:
         if feature != 'bias':
             N = model.df.loc['competitiveness'].loc['N', 'original']
@@ -24,8 +22,6 @@ def verifies_monotonicity(model):
     
     return True
 
-
-results = []
 
 X, y = load_dataset('bankruptcy')
 
@@ -39,7 +35,7 @@ for nfold in tqdm(range(n_tests)):
     model = SRR(k=3, M=3)
     model.fit(one_hot_encode(X_train_bin), y_train, verbose=False)
     
-    passed += int(verifies_monotonicity(model))
+    passed += int(bankruptcy_verifies_monotonicity(model))
 
 print("{:.1f} % passed monotonicity check".format(100 * passed / n_tests))
 
