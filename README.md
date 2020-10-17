@@ -12,10 +12,10 @@ The repository is organised as follows:
   - `preprocessing.py` contains preprocessing methods, namely `processing_pipeline`
 - The folder `data` contains the datasets' `.csv` files:
   - There are 21 UCI datasets (retrieved from the repository of the '_Simple Rules for Complex Decisions_' paper)
-  - It is here where you should put the texas and IEEECIS datasets (they are too large)
+  - It is here, in the folders `texas` and `ieeecis`, that you should put the texas and IEEECIS datasets (they are too large)
 
 There are also scripts on the main directory that allow me to verify that I didn't break anything, and also allow to reproduce some results:
-- `adversaries.py` trains SRR on the given dataset, looks for adversaries by changing only the specified columns, and outputs the adversarial examples that were found
+- `adversaries.py` trains SRR on the given dataset with the specified parameters (or loads a model if it was already trained), looks for adversaries by changing only the specified columns, and outputs the adversarial examples that were found
 - `all_uci_datasets.py` trains SRR on all UCI datasets, and outputs performance metrics for each of them
 - `bankruptcy_monotonicity.py` checks whether SRR trained on `bankruptcy` verifies monotonicity, for many train/test splits
 - `case_study.py` imitates `case_study.R` from the repository of the '_Simple Rules for Complex Decisions_' paper
@@ -26,6 +26,7 @@ Non-exhaustive list of installed conda packages:
 | :----------------------- | :-------------: | -----------: |
 |numpy                     |1.19.1           |py38hbc911f0_0|
 |pandas                    |1.1.3            |py38he6710b0_0|
+|pickle                    |4.0              |              |
 |pip                       |20.2.2           |        py38_0|
 |python                    |3.8.5            |    h7579374_1|
 |scikit-learn              |0.23.2           |py38h0573a6f_0|
