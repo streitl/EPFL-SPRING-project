@@ -17,7 +17,7 @@ We test the robustness of the model according to two main criteria:
 The repository is organised as follows:
 - The folder `src` contains the python source code of the project
   - `feature_selection.py` contains `forward_stepwise_regression`
-  - `loader.py` contains information about the datasets, and more importantly `load_dataset` (*does not work for texas/IEEECIS yet*)
+  - `loader.py` contains information about the datasets, and more importantly `load_dataset`
   - `models.py` contains `SRR`, the Select-Regress-Round implementation
   - `preprocessing.py` contains preprocessing methods, namely `processing_pipeline`
   - `vulnerabilities.py` contains `find_adversarial_examples` and `verifies_monotonicity`
