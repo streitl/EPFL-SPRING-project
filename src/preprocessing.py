@@ -175,7 +175,7 @@ def one_hot_encode(df, sep='~'):
     new_df = pd.get_dummies(df, prefix_sep=sep, dummy_na=True)
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
     
-    return new_df
+    return drop_useless_columns(new_df)
 
 
 def processing_pipeline(X, y, train_size=0.9, seed=100, nbins=3):
