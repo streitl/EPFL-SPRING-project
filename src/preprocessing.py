@@ -171,11 +171,11 @@ def one_hot_encode(df, sep='~'):
     - new_df: DataFrame with a MultiIndex column index, containing only binary features
     """
     # Construct a multi index where the first level is the original column name,
-    #  and the second level is the column value
-    new_df = pd.get_dummies(df, prefix_sep=sep, dummy_na=True)
+    #  and the second level is the column value (if there are nan values, create a nan entry as well)
+    new_df = pd.get_dummies(df, prefix_sep=sep, dummy_na=df.isnull().values.any())
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
     
-    return drop_useless_columns(new_df)
+    return new_df
 
 
 def processing_pipeline(X, y, train_size=0.9, seed=100, nbins=3):

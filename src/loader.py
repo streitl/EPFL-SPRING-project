@@ -11,7 +11,7 @@ DATA_DIR = "data"
 
 # Dict of dataset name to label target, used to convert the 'label' column to 0/1 vector
 targets = {
-    'adult':           " >50K",
+    'adult':           ">50K",
     'annealing':       "3",
     'audiology-std':   1,
     'bank':            "yes",
@@ -145,7 +145,7 @@ columns = {
             "thalach", "exang", "oldpeak", "slope", "ca", "thal", "label"],
     'ilpd':
             ["age", "gender", "tb", "db", "alkphos", "sgpt", "sgot", "tp",
-           "alb", "ag", "label"],
+            "alb", "ag", "label"],
     'mammo':
             ["BIRADS", "age", "shape", "margin", "density", "label"],
     'mushroom':
@@ -261,7 +261,8 @@ def load_texas():
                            usecols=cat_cols+num_cols,
                            na_values=['`'])
         
-        print(f"Loaded {i+1}/4")
+        print(f"Loaded {i+1} / 4", end='\r')
+    print()
     
     # Merge the DataFrames into a single one
     combined_df = pd.concat(q, ignore_index=True)
@@ -298,7 +299,7 @@ def load_dataset(name):
     print(f"Loading {name}...")
         
     # Load the data from the csv file
-    df = pd.read_csv(f"{DATA_DIR}/{name}.csv", sep=",",
+    df = pd.read_csv(f'{DATA_DIR}/{name}.csv', sep=',', skipinitialspace=True,
                      header=None, names=columns[name], na_values=['?'])
     
     # We want the target label/s to be 1, and the other/s 0
