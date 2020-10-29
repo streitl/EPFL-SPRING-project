@@ -7,16 +7,18 @@ from tqdm import tqdm
 from .preprocessing import one_hot_encode
 
 
-def find_adversarial_examples(srr_model, X, y, can_change):
+def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, allow_nan=True):
     """
     Given an SRR model, data points, and the features which can be changed, produces a list of 
     adversarial examples that have changed the model prediction label.
     
     Arguments:
-    - srr_model : Trained SRR model
-    - X         : DataFrame with categorical features, preprocessed but not 1-hot encoded
-    - y         : Series with the labels
-    - can_change: List with features in X that we can modify
+    - srr_model   : Trained SRR model
+    - X           : DataFrame with categorical features, preprocessed but not 1-hot encoded
+    - y           : Series with the labels
+    - can_change  : List with features in X that we can modify
+    - unit_changes: Boolean indicating whether to change a single feature at a time
+    - allow_nan   : Boolean indicating whether nans are allowed changes or not
     
     Returns:
     - adversaries_and_originals: Dataframe with adversarial examples
@@ -37,10 +39,16 @@ def find_adversarial_examples(srr_model, X, y, can_change):
     correctly_classified['label~original'] = y[y_pred == y]
     
     # Create a mapping from features to possible categories
-    feat_to_cats = {feat: list(X[feat].unique()) for feat in X.columns}
+    if allow_nan:
+        feat_to_cats = {feat: list(X[feat].unique()) for feat in modifiable_features}
+    else:
+        feat_to_cats = {feat: list(X[feat].dropna().unique()) for feat in modifiable_features}
     
     # Create a list with tuples of possible feature changes
-    possible_changes = list(product(*[feat_to_cats[feat] for feat in modifiable_features]))
+    if unit_changes:
+        possible_changes = [(k, v) for k, l in feat_to_cats.items() for v in l]
+    else:
+        possible_changes = [(modifiable_features, feat) for feat in (product(*feat_to_cats.values()))]
     
     
     ## Construct a list of potential adversarial examples by deforming each correctly classified sample
@@ -50,11 +58,11 @@ def find_adversarial_examples(srr_model, X, y, can_change):
     for index, data in tqdm(correctly_classified.iterrows(), total=correctly_classified.shape[0]):
         
         # Go through precomputed tuples of feature changes
-        for change in possible_changes:
+        for change_cols, change_vals in possible_changes:
             
             # Modify the original data point and add it to the list
             deformed = data.copy()
-            deformed.loc[modifiable_features] = change
+            deformed.loc[change_cols] = change_vals
             potential_adversaries = potential_adversaries.append(deformed)
     
     # Get the model prediction for the adversaries
@@ -82,31 +90,35 @@ def find_adversarial_examples(srr_model, X, y, can_change):
 
 
 
-def verifies_monotonicity(model):
+def binned_features_pass_monotonicity(srr_model, X, y):
     """
     Takes a trained SRR model, and for each selected feature whose categories are intervals (and possibly nan),
-    checks that the weights corresponding to the intervals are either in increasing or decreasing order.
+    checks that the weights corresponding to the intervals are either in increasing or decreasing order, and see if
+    this non-monotonicity allows to find adversarial examples.
     
     Arguments:
     - model: Trained SRR model
     
     Returns:
-    - Boolean indicating whether the model verifies monotonicity
+    - Boolean indicating whether the binned features of the model pass monotonicity check
     """
+    # Initialize set of non-monotonic features
+    non_monotonic_features = set()
+    
     # Iterate over all features that the model uses
-    for feature in model.df.index.levels[0]:
+    for feature in srr_model.df.index.levels[0]:
         
         # Retrieve the categories corresponding to this feature
-        categories = model.df.loc[feature].index
+        categories = srr_model.df.loc[feature].index
         
-        # Intervals are of the form (left, right]
+        # Intervals are of the form '(left, right]'
         if categories.str.startswith("(").any():
             
             # Keep only non-na categories
             non_na_categories = categories[categories != 'nan']
             
             # Retrieve original weights of the model (as a Series)
-            weights = model.df.loc[feature].loc[non_na_categories, model.M]
+            weights = srr_model.df.loc[feature].loc[non_na_categories, srr_model.M]
             
             # Indicators of whether the weights have already increased/decreased so far
             increased, decreased = False, False
@@ -118,11 +130,21 @@ def verifies_monotonicity(model):
                 elif current < previous:
                     decreased = True
                 
-                # If both are true, then monotonicity is not verified for this feature
+                # If both are true, then the feature is monotonic
                 if increased and decreased:
-                    print("Monotonicity check failed for:", model.df.loc[[feature]][model.M], sep='\n')
-                    return False
+                    non_monotonic_features.add(feature)
     
-    # If no feature broke monotonicity, then the model verifies monotonicity
+    # If all features are monotonic then the test is passed
+    if len(non_monotonic_features) == 0:
+        return True
+        
+    # Look for adversarial examples by changing only the features that are non-monotonic, one at a time
+    adversarial_examples = find_adversarial_examples(srr_model, X, y, can_change=non_monotonic_features,
+                                                     unit_changes=True, allow_nan=False)
+    
+    print(f"Found the following adversaries:\n{adversarial_examples}")
+    
+    if adversarial_examples.shape[0] > 0:
+        return False
     return True
 

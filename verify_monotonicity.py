@@ -10,7 +10,7 @@ from tqdm import tqdm
 from src.loader import load_dataset
 from src.models import SRR
 from src.preprocessing import processing_pipeline, one_hot_encode
-from src.vulnerabilities import verifies_monotonicity
+from src.vulnerabilities import binned_features_pass_monotonicity
 
 
 # Instantiate the parser
@@ -44,7 +44,7 @@ for nfold in tqdm(range(args.ntests)):
     model = SRR(k=args.k, M=args.M)
     model.fit(one_hot_encode(X_train_bin), y_train, verbose=False)
     
-    passed += int(verifies_monotonicity(model))
+    passed += int(binned_features_pass_monotonicity(model, X_train_bin, y_train))
 
 print("{}: {:.1f} % passed monotonicity check".format(args.dataset, 100 * passed / args.ntests))
 
