@@ -3,15 +3,16 @@
 ## General Information
 This is the repository for the MSc semester project of Luã Streit at the SPRING lab.
 
-The main objective of this project is to see how robust is the model described on __[this paper](https://arxiv.org/abs/1702.04690])__, which we call **Select-Regress-Round** and often abbreviate as **SRR**.
+The main objective of this project is to see how robust is the model described in __[this paper](https://arxiv.org/abs/1702.04690])__, which we call **Select-Regress-Round** and often abbreviate as **SRR**.
 
 An SRR model takes two main parameters, both integers, which are **k**, the number of features that the model is allowed to use, and **M**, the maximum possible amplitude of the weights.
 
 _Note: The model only accepts categorical features, so any numerical features must first be binned._
 
-We test the robustness of the model according to two main criteria:
+We test the robustness of the model according to three main criteria:
 - _Adversarial examples_: it is possible to attack the model by performing a realistic change to a datapoint and switching the model's decision?
-- _Monotonicity_: is it possible that the model weights for a feature that was originally numerical are not monotonic?
+- _Monotonicity_: is it possible that the model weights for a feature that was originally numerical are not monotonic and allow the model's decision to be changed?
+- _Poisonining attacks_: is it possible that removing a very small number of samples from the training set results in a different model?
 
 ### Code structure
 The repository is organised as follows:
