@@ -1,13 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.model_selection import train_test_split
-
-from .preprocessing import bin_features, drop_useless_columns, one_hot_encode
-
-
 DATA_DIR = "data"
-
 
 # Dict of dataset name to label target, used to convert the 'label' column to 0/1 vector
 targets = {
@@ -171,7 +165,6 @@ columns = {
 assert columns.keys() == targets.keys(), "something is wrong with columns and targets dictionaries"
 
 
-
 def load_ieeecis():
     """
     Loads IEEE-CIS fraud detection dataset.
@@ -253,7 +246,7 @@ def load_texas():
     print("Loading texas...")
     
     # Read each of the 4 files of the dataset and put them in a list
-    q = [0] * 4
+    q = [] * 4
     for i in range(4):
         q[i] = pd.read_csv(TEXAS_PATH.format(i+1),
                            delimiter="\t",
@@ -313,4 +306,3 @@ def load_dataset(name):
     y = df['label']
     
     return X, y
-

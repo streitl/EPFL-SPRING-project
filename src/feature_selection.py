@@ -1,11 +1,45 @@
-import pandas as pd
+import numpy as np
+
 import statsmodels.api as sm
+
+from sklearn.metrics import log_loss
+
+
+def get_score(sklearn_model, X, y, criterion="AIC"):
+    """
+    Unused function for now, kept for posteriority.
+    Computes the AIC or BIC score for an sklearn model by training it on the given data,
+    and using the log likelihood of the fit.
+
+    sklearn_model could be something like LogisticRegression(penalty='l1', solver='saga', max_iter=500, C=1e20)
+
+    Arguments:
+        sklearn_model: The sklearn model to compute the score for (ex
+        X            : The predictive features
+        y            : The predicted value
+        criterion    : Either AIC or BIC
+
+    Returns:
+        the AIC or BIC score (a float)
+    """
+    sklearn_model.fit(X, y)
+
+    # Properties of the model to be used for AIC/BIC computation
+    n_feats = len(X.columns) + 1
+    n_obs = len(y)
+
+    # Get the log likelihood from the model
+    y_pred = sklearn_model.predict(X)
+    log_likelihood = -log_loss(y, y_pred, normalize=False)
+
+    # Get score using AIC or BIC formula
+    return (2 if criterion == "AIC" else np.log(n_obs)) * n_feats - 2 * log_likelihood
 
 
 def forward_stepwise_regression(X, y, k, criterion="AIC", verbose=False):
     """
     Performs forward stepwise regression.
-    Iteratively selects the feature column whose logistic model has
+    Iteratively selects the feature column whose linear regression model has
     the lowest criteria score and adds it to the set of features.
     
     Arguments:
@@ -34,26 +68,24 @@ def forward_stepwise_regression(X, y, k, criterion="AIC", verbose=False):
         
         # Keep candidate that results in the best (smallest) score
         for candidate in candidate_features:
-            # Fit a logistic regression statistical model
-            regr = sm.GLS(endog=y,
-                          exog=sm.add_constant(X[selected_features + [candidate]]),
-                          family=sm.families.Binomial()).fit()
-            # Get score
-            if criterion == "AIC": score = regr.aic
-            elif criterion == "BIC": score = regr.bic
-            else: score = 0
+        
+            # Fit a linear regression model
+            lm = sm.GLS(endog=y,
+                        exog=sm.add_constant(X[selected_features + [candidate]]))\
+                .fit()
+
+            score = lm.aic if criterion == 'AIC' else lm.bic
             
-            if verbose: print("(%s %.1f)" % (candidate, score), end=" ")
+            if verbose: print(f"{candidate} {score:.1f}", end="\n")
             
             if best_candidate is None or score < best_score:
                 best_candidate = candidate
                 best_score = score
         
-        if verbose: print("\nAdding (%s %.1f) to " % (best_candidate, best_score), selected_features)
+        if verbose: print(f"\n--> Adding {best_candidate} {best_score:.1f} to {selected_features}\n\n")
         
         # Move the best candidate feature to the list of selected features
         candidate_features.remove(best_candidate)
         selected_features.append(best_candidate)
         
     return selected_features
-

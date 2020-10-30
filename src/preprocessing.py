@@ -206,4 +206,3 @@ def processing_pipeline(X, y, train_size=0.9, seed=100, nbins=3):
     X_train_bin, X_test_bin = bin_features(X_train, X_test, nbins=nbins)
     
     return X_train_bin, X_test_bin, y_train, y_test
-

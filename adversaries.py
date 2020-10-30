@@ -53,7 +53,6 @@ else:
 # Try to load model from disk, and if it doesn't exist train it
 try:
     model = SRR.load(args.dataset, k=args.k, M=args.M)
-    
 except:
     # Fit model
     model = SRR(k=args.k, M=args.M)

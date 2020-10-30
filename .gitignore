@@ -4,3 +4,4 @@
 data/*.csv
 models/*.pkl
 notebooks/*
+.idea/*

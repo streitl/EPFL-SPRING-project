@@ -1,7 +1,6 @@
 import pandas as pd
 
 from itertools import product
-
 from tqdm import tqdm
 
 from .preprocessing import one_hot_encode
@@ -147,4 +146,3 @@ def binned_features_pass_monotonicity(srr_model, X, y):
     if adversarial_examples.shape[0] > 0:
         return False
     return True
-
