@@ -246,14 +246,14 @@ def load_texas():
     print("Loading texas...")
     
     # Read each of the 4 files of the dataset and put them in a list
-    q = [] * 4
+    q = []
     for i in range(4):
-        q[i] = pd.read_csv(TEXAS_PATH.format(i+1),
+        df = pd.read_csv(TEXAS_PATH.format(i+1),
                            delimiter="\t",
                            dtype=dtypes,
                            usecols=cat_cols+num_cols,
                            na_values=['`'])
-        
+        q.append(df)
         print(f"Loaded {i+1} / 4", end='\r')
     print()
     

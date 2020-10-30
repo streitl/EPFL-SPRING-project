@@ -15,17 +15,18 @@ class SRR(BaseEstimator, ClassifierMixin):
     An sklearn BaseEstimator implementing the Select-Regress-Round model.
     """
 
-    def __init__(self, k, M, cv=5, Cs=1000, n_jobs=-1, max_iter=150):
+    def __init__(self, k, M, cv=5, Cs=1000, n_jobs=-1, max_iter=150, random_state=42):
         """
         The SRR class constructor.
         
         Arguments:
-        - k       : # of features to be used in the model
-        - M       : Amplitude of the weights of the model
-        - cv      : # of cross-validation folds to perform when training the logistic regression model
-        - Cs      : # of regularization values to try for the logistic regression model
-        - n_jobs  : # of jobs that can run in parallel during cross validation
-        - max_iter: # of iterations for the logistic regression model optimization
+        - k           : # of features to be used in the model
+        - M           : Amplitude of the weights of the model
+        - cv          : Cross-validation folds to perform when training the logistic regression model
+        - Cs          : Regularization values to try for the logistic regression model
+        - n_jobs      : # of jobs that can run in parallel during cross validation
+        - max_iter    : Iterations for the logistic regression model optimization
+        - random_state: Int to be used for reproducibility
         """
         assert int(k) == k, "k must be an integer"
         assert k > 0, "k must be positive"
@@ -44,6 +45,7 @@ class SRR(BaseEstimator, ClassifierMixin):
         self.Cs = Cs
         self.n_jobs = n_jobs
         self.max_iter = max_iter
+        self.random_state = random_state
 
         # Initialize variables
         self.selected_features = None
@@ -81,7 +83,8 @@ class SRR(BaseEstimator, ClassifierMixin):
             Cs=self.Cs, solver="saga",
             fit_intercept=True,
             n_jobs=self.n_jobs,
-            max_iter=self.max_iter
+            max_iter=self.max_iter,
+            random_state=self.random_state
         )
 
         if verbose: print("Cross-validating the logistic regression model...")

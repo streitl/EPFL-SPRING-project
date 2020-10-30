@@ -73,7 +73,7 @@ def forward_stepwise_regression(X, y, k, criterion="AIC", kind="linear", verbose
 
             if kind == "linear":
                 # Fit a linear regression model
-                lm = sm.GLS(endog=y,
+                lm = sm.OLS(endog=y,
                             exog=sm.add_constant(X[selected_features + [candidate]]))\
                     .fit()
 
