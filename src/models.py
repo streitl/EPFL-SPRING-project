@@ -50,7 +50,7 @@ class SRR(BaseEstimator, ClassifierMixin):
         self.df = None
 
 
-    def fit(self, X, y, verbose=False):
+    def fit(self, X, y, kind="linear", verbose=False):
         """
         Performs the Select-Regress-Round training procedure:
             1. Using forward stepwise logistic regression, selects the best k features
@@ -61,13 +61,14 @@ class SRR(BaseEstimator, ClassifierMixin):
         Arguments:
         - X      : DataFrame with the features, one-hot encoded and with a two-level column index
         - y      : DataFrame with the target
+        - kind   : Regression to be used for the feature selection, either linear or logistic
         - verbose: Boolean value indicating whether to print intermediary results
         """
         assert self.k <= len(X.columns.levels[0]), "the given dataset has less than k features"
 
         ## Step 1. Select k features
         if verbose: print("Selecting", self.k, "features...")
-        selected_features = forward_stepwise_regression(X, y, self.k, verbose=verbose)
+        selected_features = forward_stepwise_regression(X, y, self.k, verbose=verbose, kind=kind)
         if verbose: print("Selected features", ', '.join(selected_features))
 
         # Store the selected features in the model

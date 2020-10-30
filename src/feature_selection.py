@@ -1,9 +1,9 @@
 import numpy as np
 
 import statsmodels.api as sm
+from sklearn.linear_model import LogisticRegression
 
 from sklearn.metrics import log_loss
-
 
 def get_score(sklearn_model, X, y, criterion="AIC"):
     """
@@ -36,10 +36,10 @@ def get_score(sklearn_model, X, y, criterion="AIC"):
     return (2 if criterion == "AIC" else np.log(n_obs)) * n_feats - 2 * log_likelihood
 
 
-def forward_stepwise_regression(X, y, k, criterion="AIC", verbose=False):
+def forward_stepwise_regression(X, y, k, criterion="AIC", kind="linear", verbose=False):
     """
     Performs forward stepwise regression.
-    Iteratively selects the feature column whose linear regression model has
+    Iteratively selects the feature column whose regression model has
     the lowest criteria score and adds it to the set of features.
     
     Arguments:
@@ -47,6 +47,7 @@ def forward_stepwise_regression(X, y, k, criterion="AIC", verbose=False):
     - y        : DataFrame with the target
     - k        : Number of features to be selected
     - criterion: String indicating which criteria to use to score a model
+    - kind     : Which kind of regression to perform, linear or logistic
     - verbose  : Boolean indicating whether to print intermediate results
     
     Returns:
@@ -55,6 +56,7 @@ def forward_stepwise_regression(X, y, k, criterion="AIC", verbose=False):
     # The number of features to be selected must be smaller than the number of columns
     assert k <= len(X.columns.levels[0]), "the given dataset has less than k features"
     assert criterion in ["AIC", "BIC"], "the criterion must be AIC or BIC"
+    assert kind in ["linear", "logistic"], "the model can only be linear or logistic"
     
     # We keep track of all features already added to the model and all that can be added
     candidate_features = list(X.columns.levels[0])
@@ -68,13 +70,19 @@ def forward_stepwise_regression(X, y, k, criterion="AIC", verbose=False):
         
         # Keep candidate that results in the best (smallest) score
         for candidate in candidate_features:
-        
-            # Fit a linear regression model
-            lm = sm.GLS(endog=y,
-                        exog=sm.add_constant(X[selected_features + [candidate]]))\
-                .fit()
 
-            score = lm.aic if criterion == 'AIC' else lm.bic
+            if kind == "linear":
+                # Fit a linear regression model
+                lm = sm.GLS(endog=y,
+                            exog=sm.add_constant(X[selected_features + [candidate]]))\
+                    .fit()
+
+                score = lm.aic if criterion == 'AIC' else lm.bic
+            else:
+                # Fit a logistic regression model
+                logit = LogisticRegression(penalty='l1', solver='saga', max_iter=500, C=1e20)
+
+                score = get_score(logit, X=X[selected_features + [candidate]], y=y, criterion=criterion)
             
             if verbose: print(f"{candidate} {score:.1f}", end="\n")
             
