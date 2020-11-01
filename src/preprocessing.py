@@ -162,6 +162,7 @@ def one_hot_encode(df, sep='~'):
     """
     One-hot encodes the given dataset, by transforming each categorical feature column into
      a set of binary features, and grouping them together in a pandas MultiIndex.
+    If a column contains NaNs, then the dummy DataFrame will have a NaN in the second level as well.
     
     Arguments:
     - df : DataFrame to one-hot encode
@@ -170,9 +171,13 @@ def one_hot_encode(df, sep='~'):
     Returns:
     - new_df: DataFrame with a MultiIndex column index, containing only binary features
     """
-    # Construct a multi index where the first level is the original column name,
-    #  and the second level is the column value (if there are nan values, create a nan entry as well)
-    new_df = pd.get_dummies(df, prefix_sep=sep, dummy_na=df.isnull().values.any())
+    # Initialize the DataFrame
+    new_df = pd.DataFrame()
+    for col in df.columns:
+        # Dummy column, and if this column contains nan, create a dummy column for nans as well
+        temp_df = pd.get_dummies(df[[col]], prefix_sep=sep, dummy_na=df[col].isna().any())
+        for cat in temp_df.columns:
+            new_df[cat] = temp_df[cat]
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
     
     return new_df
