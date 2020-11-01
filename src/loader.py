@@ -92,7 +92,7 @@ columns = {
     'credit-approval':
             ["A" + str(i) for i in range(1, 15+1)] + ["label"],
     'ctg':
-            ["FileName", "Date", "b", "e", "LBE", "LB", "AC", "FM", "UC",
+            ["Date", "b", "e", "LBE", "LB", "AC", "FM", "UC",
             "ASTV", "mSTV", "ALTV", "mLTV", "DL", "DS", "DP", "DR", "Width",
             "Min", "Max", "Nmax", "Nzeros", "Mode", "Mean", "Median",
             "Variance", "Tendency", "A", "B", "C", "D", "SH", "AD", "DE",

@@ -15,7 +15,7 @@ class SRR(BaseEstimator, ClassifierMixin):
     An sklearn BaseEstimator implementing the Select-Regress-Round model.
     """
 
-    def __init__(self, k, M, cv=5, Cs=1000, n_jobs=-1, max_iter=300, random_state=42):
+    def __init__(self, k, M, cv=5, Cs=1000, n_jobs=-1, max_iter=150, random_state=42):
         """
         The SRR class constructor.
         
@@ -71,7 +71,7 @@ class SRR(BaseEstimator, ClassifierMixin):
         ## Step 1. Select k features
         if verbose: print("Selecting", self.k, "features...")
         selected_features = forward_stepwise_regression(X, y, self.k, verbose=verbose, kind=kind)
-        if verbose: print("Selected features", ', '.join(selected_features))
+        print("Selected features", ', '.join(selected_features))
 
         # Store the selected features in the model
         self.selected_features = selected_features
