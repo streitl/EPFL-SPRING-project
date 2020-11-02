@@ -49,7 +49,6 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
     else:
         possible_changes = [(modifiable_features, feat) for feat in (product(*feat_to_cats.values()))]
     
-    
     ## Construct a list of potential adversarial examples by deforming each correctly classified sample
     potential_adversaries = pd.DataFrame(columns=correctly_classified.columns)
     
@@ -96,7 +95,9 @@ def binned_features_pass_monotonicity(srr_model, X, y):
     this non-monotonicity allows to find adversarial examples.
     
     Arguments:
-    - model: Trained SRR model
+    - srr_model: Trained SRR model
+    - X        : DataFrame with the features
+    - y        : DataFrame with the label
     
     Returns:
     - Boolean indicating whether the binned features of the model pass monotonicity check
