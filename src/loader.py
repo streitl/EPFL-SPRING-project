@@ -174,8 +174,8 @@ def load_ieeecis():
     Also does some preprocessing, like removing version numbers from OS and broswer.
     
     Returns:
-    - X: DataFrame with the features
-    - y: DataFrame with the label, values are only 0 and 1
+        X: DataFrame with the features
+        y: DataFrame with the label, values are only 0 and 1
     """
     IEECIS_PATH = DATA_DIR + "/ieeecis"
     
@@ -230,6 +230,10 @@ def load_texas():
     Loads Texas Hospital Discharge dataset.
 
     Code is based on a script by Theresa Stadler.
+
+    Returns:
+        X: DataFrame with the features
+        y: DataFrame with the label, values are only 0 and 1
     """
     TEXAS_PATH = DATA_DIR + "/texas/PUDF_base1_{}q2013_tab.txt"
 
@@ -275,12 +279,12 @@ def load_dataset(name):
     """
     Loads the dataset with the given name, and returns two DataFrames with the features and label.
     
-    Arguments:
-    - name: string name of the dataset to load, without the '.csv' extension
+    Args:
+        name: string name of the dataset to load, without the '.csv' extension
     
     Returns:
-    - X: DataFrame with the features
-    - y: DataFrame with the label, values are only 0 and 1
+        X: DataFrame with the features
+        y: DataFrame with the label, values are only 0 and 1
     """
     if name == "texas":
         return load_texas()

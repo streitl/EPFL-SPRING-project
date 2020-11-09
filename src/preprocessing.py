@@ -8,11 +8,11 @@ def drop_useless_columns(X):
     """
     Drops columns of the given dataframe that have no information (always same value).
     
-    Arguments:
-    - X: DataFrame to clean
+    Args:
+        X: DataFrame to clean
     
     Returns:
-    - X_new: A copy the original DataFrame with potentially fewer columns
+        X_new: A copy the original DataFrame with potentially fewer columns
     """
     X_new = X.copy()
     for col in X.columns:
@@ -32,9 +32,12 @@ def find_boundaries(series, nbins=3):
     To do so, we try to find appropriate breaks in two passes: one on the index-ordered
     histogram of series, and another on the same histogram but in descending order.
     
-    Arguments:
-    - series: A pandas Series of numerical values
-    - nbins : The # of bins to be defined with the boundaries
+    Args:
+        series: A pandas Series of numerical values
+        nbins : The # of bins to be defined with the boundaries
+
+    Returns:
+        List of float boundaries that split the series into up to nbins bins
     """
     assert int(nbins) == nbins, "the number of bins must be an int"
     assert 2 <= nbins, "the number of bins must be at least 2"
@@ -61,12 +64,12 @@ def find_boundaries(series, nbins=3):
             yet been covered by the sum. We also reset the cumulative sum to 0.
         4. We stop when n is 1 (since there is no 1-th quantile).
         
-        Arguments:
-        - ascending: Boolean value indicating whether to iterate over
-                      the counts in ascending or descending order
+        Args:
+            ascending: Boolean value indicating whether to iterate over
+                        the counts in ascending or descending order
         
         Returns:
-        - breaks: A sorted list of float values whose size is at most nbins-1
+            breaks: A sorted list of float values whose size is at most nbins-1
         """
         # This represents which quantile we want to find
         n = nbins
@@ -123,14 +126,14 @@ def bin_features(X_train, X_test, nbins):
     Bins the numerical features of the input DataFrames, by first defining quantiles
      based on the training set, and then using quantiles to split the features into groups.
     
-    Arguments:
-    - X_train: DataFrame to be binned, used to compute the quantiles
-    - X_test : DataFrame to be binned
-    - nbins  : # of bins to be defined
+    Args:
+        X_train: DataFrame to be binned, used to compute the quantiles
+        X_test : DataFrame to be binned
+        nbins  : # of bins to be defined
     
     Returns:
-    - X_train_bin: DataFrame whose numerical features are binned
-    - X_test_bin : DataFrame whose numerical features are binned
+        X_train_bin: DataFrame whose numerical features are binned
+        X_test_bin : DataFrame whose numerical features are binned
     """
     # Copy the data
     X_train_bin = X_train.copy()
@@ -164,18 +167,18 @@ def one_hot_encode(df, sep='~'):
      a set of binary features, and grouping them together in a pandas MultiIndex.
     If a column contains NaNs, then the dummy DataFrame will have a NaN in the second level as well.
     
-    Arguments:
-    - df : DataFrame to one-hot encode
-    - sep: String to be used for the construction of the MultiIndex, can't belong to the columns
+    Args:
+        df : DataFrame to one-hot encode
+        sep: String to be used for the construction of the MultiIndex, can't belong to the columns
     
     Returns:
-    - new_df: DataFrame with a MultiIndex column index, containing only binary features
+        new_df: DataFrame with a MultiIndex column index, containing only binary features
     """
     # Initialize the DataFrame
     new_df = pd.DataFrame()
     for col in df.columns:
         # Dummy column, and if this column contains nan, create a dummy column for nans as well
-        temp_df = pd.get_dummies(df[[col]], prefix_sep=sep, dummy_na=df[col].isna().any())
+        temp_df = pd.get_dummies(df[[col]], columns=[col], prefix_sep=sep, dummy_na=df[col].isna().any())
         for cat in temp_df.columns:
             new_df[cat] = temp_df[cat]
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
@@ -187,18 +190,18 @@ def processing_pipeline(X, y, train_size=0.9, seed=100, nbins=3):
     """
     Applies the whole processing pipeline (except 1-hot encoding).
     
-    Arguments:
-    - X         : DataFrame with the unprocessed features
-    - y         : DataFrame with the labels
-    - train_size: Proportion of data that goes towards training
-    - seed      : Random seed to be used when splitting the data intro train and test
-    - nbins     : Number of bins to partition numerical data into
+    Args:
+        X         : DataFrame with the unprocessed features
+        y         : DataFrame with the labels
+        train_size: Proportion of data that goes towards training
+        seed      : Random seed to be used when splitting the data intro train and test
+        nbins     : Number of bins to partition numerical data into
     
     Returns:
-    - X_train: DataFrame with the train features, cleaned and processed
-    - X_test : DataFrame with the test features, cleaned and processed
-    - y_train: DataFrame with the train labels, values are only 0 and 1
-    - y_test : DataFrame with the test labels, values are only 0 and 1
+        X_train: DataFrame with the train features, cleaned and processed
+        X_test : DataFrame with the test features, cleaned and processed
+        y_train: DataFrame with the train labels, values are only 0 and 1
+        y_test : DataFrame with the test labels, values are only 0 and 1
     """
     # Removes columns with no information
     X_clean = drop_useless_columns(X)

@@ -13,7 +13,7 @@ def get_score(sklearn_model, X, y, criterion="AIC"):
 
     sklearn_model could be something like LogisticRegression(penalty='l1', solver='saga', max_iter=500, C=1e20)
 
-    Arguments:
+    Args:
         sklearn_model: The sklearn model to compute the score for (ex
         X            : The predictive features
         y            : The predicted value
@@ -36,22 +36,22 @@ def get_score(sklearn_model, X, y, criterion="AIC"):
     return (2 if criterion == "AIC" else np.log(n_obs)) * n_feats - 2 * log_likelihood
 
 
-def forward_stepwise_regression(X, y, k, criterion="AIC", kind="linear", verbose=False):
+def forward_stepwise_regression(X, y, k, criterion="AIC", kind="linear", verbose=0):
     """
     Performs forward stepwise regression.
     Iteratively selects the feature column whose regression model has
     the lowest criteria score and adds it to the set of features.
     
-    Arguments:
-    - X        : DataFrame with the features, one-hot encoded and with a two-level column index
-    - y        : DataFrame with the target
-    - k        : Number of features to be selected
-    - criterion: String indicating which criteria to use to score a model
-    - kind     : Which kind of regression to perform, linear or logistic
-    - verbose  : Boolean indicating whether to print intermediate results
+    Args:
+        X        : DataFrame with the features, one-hot encoded and with a two-level column index
+        y        : DataFrame with the target
+        k        : Number of features to be selected
+        criterion: String indicating which criteria to use to score a model
+        kind     : Which kind of regression to perform, linear or logistic
+        verbose  : Integer level of verbosity
     
     Returns:
-    - selected_features: A list of k features from X
+        selected_features: A list of k features from X
     """
     # The number of features to be selected must be smaller than the number of columns
     assert k <= len(X.columns.levels[0]), "the given dataset has less than k features"
@@ -84,13 +84,13 @@ def forward_stepwise_regression(X, y, k, criterion="AIC", kind="linear", verbose
 
                 score = get_score(logit, X=X[selected_features + [candidate]], y=y, criterion=criterion)
             
-            if verbose: print(f"{candidate} {score:.1f}", end="\n")
+            if verbose >= 2: print(f"{candidate} {score:.1f}", end="\n")
             
             if best_candidate is None or score < best_score:
                 best_candidate = candidate
                 best_score = score
         
-        if verbose: print(f"\n--> Adding {best_candidate} {best_score:.1f} to {selected_features}\n\n")
+        if verbose >= 2: print(f"\n--> Adding {best_candidate} {best_score:.1f} to {selected_features}\n\n")
         
         # Move the best candidate feature to the list of selected features
         candidate_features.remove(best_candidate)
