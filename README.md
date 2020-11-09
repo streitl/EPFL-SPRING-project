@@ -21,7 +21,8 @@ The repository is organised as follows:
   - `loader.py` contains information about the datasets, and more importantly `load_dataset`
   - `models.py` contains `SRR`, the Select-Regress-Round implementation
   - `preprocessing.py` contains preprocessing methods, namely `processing_pipeline`
-  - `vulnerabilities.py` contains `find_adversarial_examples` and `binned_features_pass_monotonicity`
+  - `vulnerabilities.py` contains `find_adversarial_examples`, `poisoning_attack`, and `binned_features_pass_monotonicity`
+- The folder `tests` contains one test file per python file in `src`, which tests the functionality of the functions in this file
 - The folder `data` contains the datasets' `.csv` files:
   - There are 21 UCI datasets (retrieved from the repository of the '_Simple Rules for Complex Decisions_' paper)
   - It is here, in the folders `texas` and `ieeecis`, that you should put the texas and IEEECIS datasets (they are too large)
