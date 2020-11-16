@@ -3,11 +3,11 @@ import sys
 import pandas as pd
 import numpy as np
 
-from itertools import product
 from tqdm import tqdm
+from itertools import product
 
 from .preprocessing import one_hot_encode
-from .models import SRR
+from .models import SRR, RoundedLogisticRegression, SRRWithoutCrossValidation
 
 
 def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, allow_nan=True):
@@ -151,9 +151,7 @@ def binned_features_pass_monotonicity(srr_model, X, y):
     return True
 
 
-def poisoning_attack(original_model, X_train, y_train,
-                     feature, category=None,
-                     goal='flip_sign', col='normal'):
+def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goal='nullify', col='normal'):
     """
     Performs a poisoning attack by iteratively removing points from the training set of the given model.
 
@@ -175,28 +173,33 @@ def poisoning_attack(original_model, X_train, y_train,
         'M'       : from the SRR model (not recommended, likely no changes)
 
     Args:
-        original_model: pre-trained SRR model on the given dataset
-        X_train       : training set DataFrame with the features, binned but not 1-hot encoded
-        y_train       : training set Series with the labels
-        feature       : feature of the model to poison
-        category      : optional (only defined if goal is 'flip_sign' or 'nullify')
-        goal          : the goal of the poisoning attack
-        col           : which kind of weight to use
+        original_srr: pre-trained SRR model on the given dataset
+        X_train     : training set DataFrame with the features, binned but not 1-hot encoded
+        y_train     : training set Series with the labels
+        feature     : feature of the model to poison
+        category    : optional (only defined if goal is 'flip_sign' or 'nullify')
+        goal        : the goal of the poisoning attack
+        col         : which kind of weight to use
 
     Returns:
-        removals: List with the indices of the datapoints that were removed
+        removals: List with the indices of the data points that were removed
     """
     # Validation of parameters
     assert goal in ['flip_sign', 'remove_feature', 'nullify'], \
         "goal must be either 'flip_sign', 'remove_feature', or 'nullify'"
     assert col in ['original', 'relative', 'normal', 'M'], \
             "col must be either 'original', 'relative', 'normal', or 'M'"
-    assert category is not None or goal == 'remove_feature', \
-        "category can be None only if goal is 'remove_feature'"
+    assert (category is not None) ^ (goal == 'remove_feature'), \
+        "category can only be None if goal is 'remove_feature'"
+
+    if col == 'M':
+        col = original_srr.M
 
     if goal in ['flip_sign', 'nullify']:
+        # We approximate SRR by a version without feature selection and cross-validation in this case
+        model_kind = RoundedLogisticRegression
         # This is the SRR weight that we want to change
-        original_weight = original_model.get_weight(feature, category)
+        original_weight = original_srr.get_weight(feature, category)
 
         # Check whether the original weight is already 0
         if original_weight == 0 and goal == 'flip_sign':
@@ -209,7 +212,10 @@ def poisoning_attack(original_model, X_train, y_train,
             print(f'Original weight is positive ({original_weight:.0f}), so we want it to decrease.')
         else:
             print(f'Original weight is negative ({original_weight:.0f}), so we want it to increase.')
-
+        sys.stdout.flush()
+    else: # goal == 'remove_feature'
+        # We approximate SRR by a version without cross-validation in this case
+        model_kind = SRRWithoutCrossValidation
 
     # Define the base set from which we remove one feature at a time.
     # Initially it's a copy of the given training set.
@@ -219,12 +225,10 @@ def poisoning_attack(original_model, X_train, y_train,
     # The list with the points we remove from the training set
     removals = []
 
+    srr = original_srr
     iteration = 0
     # Stop when we remove half the training points (or if the goal is achieved inside the while loop)
     while iteration < X_train.shape[0] / 2:
-        print(f'Iteration {iteration}')
-        sys.stdout.flush()
-
         # Instantiate DataFrame to put results in
         if goal in ['flip_sign', 'nullify']:
             res = pd.DataFrame(dtype=float, columns=[col, 'M'])
@@ -232,19 +236,16 @@ def poisoning_attack(original_model, X_train, y_train,
             res = pd.DataFrame(dtype=float, columns=[col])
 
         # Iterate over all points over the base set (which we want to remove)
-        for ith_point, _ in tqdm(X_base.iterrows(),
-                                 total=X_base.shape[0],
-                                 position=0,
-                                 leave=True):
+        for ith_point, _ in tqdm(X_base.iterrows(), total=X_base.shape[0], leave=True, position=0):
 
             # Create dataset without i-th point
             X_no_i = X_base.drop(index=ith_point)
             y_no_i = y_base.drop(index=ith_point)
 
-            # Fit model to reduced dataset
-            model = SRR.new_model_with_same_params_as(original_model)
+            # Fit alternative model (with same parameters as srr) to reduced dataset
+            model = model_kind.from_srr(srr)
             try:
-                model.fit(one_hot_encode(X_no_i), y_no_i, verbose=False)
+                model.fit(one_hot_encode(X_no_i), y_no_i)
             except ValueError:
                 # This error happens when there are no samples of some class in the training set
                 # In this case, we break the loop
@@ -259,12 +260,11 @@ def poisoning_attack(original_model, X_train, y_train,
                     print(f'Model had no weights when removing {removals} and {ith_point}')
                     res.loc[ith_point] = (np.nan, np.nan)
             elif goal == 'remove_feature':
-                try:
-                    res.loc[ith_point] = model.df.loc[feature, col].mean()
-                except KeyError:
-                    # If we could not access the weight, then we have successfully removed the feature
-                    print(f'Successfully removed feature {feature}!')
-                    return removals + [ith_point]
+                if feature in model.features:
+                    res.loc[ith_point] = model.df.loc[feature, col].abs().mean()
+                else:
+                    # The feature is not present in the alternate model so we notify this with a NaN
+                    res.loc[ith_point] = np.nan
 
         # Find which point brings us closer to our goal (or achieves it)
         if goal == 'flip_sign':
@@ -276,352 +276,41 @@ def poisoning_attack(original_model, X_train, y_train,
         elif goal == 'nullify':
             # In this case we are looking for the point that brings us closer to 0
             best_point = res[col].abs().idxmin()
-        elif goal == 'remove_feature':
-            # Here we also just keep the point which brings us closer to zero
-            best_point = res[col].abs().idxmin()
+        else: # goal == 'remove_feature':
+            # If some data point caused a feature removal
+            if res[col].isna().any():
+                # Keep the first point with nan (arbitrarily)
+                best_point = res[res[col].isna()].index[0]
+            else:
+                # Otherwise we keep the point which brings us closer to zero
+                best_point = res[col].abs().idxmin()
 
         # Add the best point to our list of removals
         removals.append(best_point)
+        iteration += 1
 
-        # Check if we have achieved our goal, and if so, return list of removals
-        if goal == 'flip_sign' and original_weight * res.loc[best_point, 'M'] < 0:
-            return removals
-        elif goal == 'nullify' and res.loc[best_point, 'M'] == 0:
-            return removals
-        elif goal == 'remove_feature' and np.isnan(res.loc[best_point, col]):
-            return removals
-
-        # If we haven't achieved the goal, remove the current best point from the base set and restart
+        # Remove the current best point from the base set
         X_base.drop(index=best_point, inplace=True)
         y_base.drop(index=best_point, inplace=True)
 
-        iteration += 1
+        # Train SRR model on the new reduced dataset to see if the goal was achieved
+        srr = SRR.copy_params(original_srr)
+        srr.fit(one_hot_encode(X_base), y_base)
 
-    print("Could not achieve goal...")
-    return removals
+        # Check if we have achieved our goal, and if so, return list of removals
+        if (goal == 'flip_sign' and original_weight * srr.get_weight(feature, category) < 0) \
+                or (goal == 'nullify' and srr.get_weight(feature, category) == 0) \
+                or (goal == 'remove_feature' and feature not in srr.features):
+            print('\nAttack successful! :D')
+            return removals
 
-
-def poisoning_attack_flip_sign(original_model, X_train, y_train,
-                               feature, category, col='normal'):
-    """
-    Performs a poisoning attack by iteratively removing points from the training set of the given model,
-    with the goal of flipping the sign of the weight of the the specified feature.
-
-    To achieve this, we try to maximize/minimize some weight of the model corresponding to the (feature, category) pair.
-
-    Many different kinds of weights can be used, determined by the 'col' param:
-        'original': from the inner logistic regression model
-        'relative': from the SRR model right before multiplication by M and rounding
-                        (not recommended, if weight is the biggest/smallest, then likely no changes)
-        'normal'  : from the inner logistic regression model but normalized (recommended)
-        'M'       : from the SRR model (not recommended, likely no changes)
-
-    Args:
-        original_model: pre-trained SRR model on the given dataset
-        X_train       : training set DataFrame with the features, binned but not 1-hot encoded
-        y_train       : training set Series with the labels
-        feature       : feature of the model to poison
-        category      : category of the model to poison
-        col           : which kind of weight to use
-
-    Returns:
-        removals: List with the indices of the datapoints that were removed
-    """
-    # Validation of parameters
-    assert col in ['original', 'relative', 'normal', 'M'], \
-            "col must be either 'original', 'relative', 'normal', or 'M'"
-
-    # This is the SRR weight that we want to change
-    original_weight = original_model.get_weight(feature, category)
-
-    # Check whether the original weight is already 0
-    if original_weight == 0:
-        raise ValueError('Cannot flip weight sign of feature with weight 0.')
-    elif original_weight > 0:
-        print(f'Original weight is positive ({original_weight:.0f}), so we want it to decrease.')
-    else:
-        print(f'Original weight is negative ({original_weight:.0f}), so we want it to increase.')
-
-
-    # Define the base set from which we remove one feature at a time.
-    # Initially it's a copy of the given training set.
-    X_base = X_train.copy()
-    y_base = y_train.copy()
-
-    # The list with the points we remove from the training set
-    removals = []
-
-    iteration = 0
-    # Stop when we remove half the training points (or if the goal is achieved inside the while loop)
-    while iteration < X_train.shape[0] / 2:
-        print(f'Iteration {iteration}')
-        sys.stdout.flush()
-
-        # Instantiate DataFrame to put results inç
-        res = pd.DataFrame(dtype=float, columns=[col, 'M'])
-
-        # Iterate over all points over the base set (which we want to remove)
-        for ith_point, _ in tqdm(X_base.iterrows(),
-                                 total=X_base.shape[0],
-                                 position=0,
-                                 leave=True):
-
-            # Create dataset without i-th point
-            X_no_i = X_base.drop(index=ith_point)
-            y_no_i = y_base.drop(index=ith_point)
-
-            # Fit model to reduced dataset
-            model = SRR.new_model_with_same_params_as(original_model)
-            try:
-                model.fit(one_hot_encode(X_no_i), y_no_i, verbose=False)
-            except ValueError:
-                # This error happens when there are no samples of some class in the training set
-                # In this case, we break the loop
-                print("Could not achieve goal...")
-                return removals
-
-            # Try to retrieve values of interest
-            try:
-                res.loc[ith_point] = model.df.loc[(feature, category)][[col, model.M]].values
-            except KeyError:
-                print(f'Model had no weights when removing {removals} and {ith_point}')
-                res.loc[ith_point] = (np.nan, np.nan)
-
-        # Find which point brings us closer to our goal (or achieves it)
-        # In this case we want the point which brings us closer to the opposite sign of the original weight
-        if original_weight > 0:
-            best_point = res[col].idxmin()
+        if goal in ['flip_sign', 'nullify']:
+            s = srr.df.loc[(feature, category), [col, srr.M]]
+            print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
         else:
-            best_point = res[col].idxmax()
-
-        # Add the best point to our list of removals
-        removals.append(best_point)
-
-        # Check if we have achieved our goal, and if so, return list of removals
-        if original_weight * res.loc[best_point, 'M'] < 0:
-            return removals
-
-        # If we haven't achieved the goal, remove the current best point from the base set and restart
-        X_base.drop(index=best_point, inplace=True)
-        y_base.drop(index=best_point, inplace=True)
-
-        print(f'Best point {best_point} with ({col}, M) values {res.loc[best_point].values}')
+            s = srr.df.loc[feature, [col, srr.M]].abs().mean()
+            print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
         sys.stdout.flush()
 
-        iteration += 1
-
-    print("Could not achieve goal...")
-    return removals
-
-
-def poisoning_attack_nullify(original_model, X_train, y_train,
-                             feature, category, col='normal'):
-    """
-    Performs a poisoning attack by iteratively removing points from the training set of the given model,
-    with the goal of changing the (feature, category) weight of the model to 0.
-
-    To achieve this goal, we try to decrease the absolute value of some weight of the model
-    corresponding to the given feature and category.
-
-    Many different kinds of weights can be used, determined by the 'col' param:
-        'original': from the inner logistic regression model
-        'relative': from the SRR model right before multiplication by M and rounding
-                        (not recommended, if weight is the biggest/smallest, then likely no changes)
-        'normal'  : from the inner logistic regression model but normalized (recommended)
-        'M'       : from the SRR model (not recommended, likely no changes)
-
-    Args:
-        original_model: pre-trained SRR model on the given dataset
-        X_train       : training set DataFrame with the features, binned but not 1-hot encoded
-        y_train       : training set Series with the labels
-        feature       : feature of the model to poison
-        category      : category of the model to poison
-        col           : which kind of weight to use
-
-    Returns:
-        removals: List with the indices of the datapoints that were removed
-    """
-    # Validation of parameters
-    assert col in ['original', 'relative', 'normal', 'M'], \
-            "col must be either 'original', 'relative', 'normal', or 'M'"
-
-    # This is the SRR weight that we want to change
-    original_weight = original_model.get_weight(feature, category)
-
-    # Check whether the original weight is already 0
-    if original_weight == 0:
-        print('The weight is already null. Stopping.')
-        return []
-
-    if original_weight > 0:
-        print(f'Original weight is positive ({original_weight:.0f}), so we want it to decrease.')
-    else:
-        print(f'Original weight is negative ({original_weight:.0f}), so we want it to increase.')
-
-
-    # Define the base set from which we remove one feature at a time.
-    # Initially it's a copy of the given training set.
-    X_base = X_train.copy()
-    y_base = y_train.copy()
-
-    # The list with the points we remove from the training set
-    removals = []
-
-    iteration = 0
-    # Stop when we remove half the training points (or if the goal is achieved inside the while loop)
-    while iteration < X_train.shape[0] / 2:
-        print(f'Iteration {iteration}')
-        sys.stdout.flush()
-
-        # Instantiate DataFrame to put results in
-        res = pd.DataFrame(dtype=float, columns=[col, 'M'])
-
-        # Iterate over all points over the base set (which we want to remove)
-        for ith_point, _ in tqdm(X_base.iterrows(),
-                                 total=X_base.shape[0],
-                                 position=0,
-                                 leave=True):
-
-            # Create dataset without i-th point
-            X_no_i = X_base.drop(index=ith_point)
-            y_no_i = y_base.drop(index=ith_point)
-
-            # Fit model to reduced dataset
-            model = SRR.new_model_with_same_params_as(original_model)
-            try:
-                model.fit(one_hot_encode(X_no_i), y_no_i, verbose=False)
-            except ValueError:
-                # This error happens when there are no samples of some class in the training set
-                # In this case, we break the loop
-                print("Could not achieve goal...")
-                return removals
-
-            # Try to retrieve values of interest
-            try:
-                res.loc[ith_point] = model.df.loc[(feature, category)][[col, model.M]].values
-            except KeyError:
-                print(f'Model had no weights when removing {removals} and {ith_point}')
-                res.loc[ith_point] = (np.nan, np.nan)
-
-        # Find which point brings us closer to our goal (or achieves it)
-        # In this case we are looking for the point that brings us closer to 0
-        best_point = res[col].abs().idxmin()
-
-        # Add the best point to our list of removals
-        removals.append(best_point)
-
-        # Check if we have achieved our goal, and if so, return list of removals
-        if res.loc[best_point, 'M'] == 0:
-            return removals
-
-        # If we haven't achieved the goal, remove the current best point from the base set and restart
-        X_base.drop(index=best_point, inplace=True)
-        y_base.drop(index=best_point, inplace=True)
-
-        iteration += 1
-
-    print("Could not achieve goal...")
-    return removals
-
-
-def poisoning_attack_remove_feature(original_model, X_train, y_train,
-                                   feature, col='normal'):
-    """
-    Performs a poisoning attack by iteratively removing points from the training set of the given model.
-
-    To achieve this goal, we try to nullify the weights of all categories for 'feature',
-    in order to make the feature irrelevant.
-
-    Many different kinds of weights can be used, determined by the 'col' param:
-        'original': from the inner logistic regression model
-        'relative': from the SRR model right before multiplication by M and rounding
-                        (not recommended, if weight is the biggest/smallest, then likely no changes)
-        'normal'  : from the inner logistic regression model but normalized (recommended)
-        'M'       : from the SRR model (not recommended, likely no changes)
-
-    Args:
-        original_model: pre-trained SRR model on the given dataset
-        X_train       : training set DataFrame with the features, binned but not 1-hot encoded
-        y_train       : training set Series with the labels
-        feature       : feature of the model to poison
-        col           : which kind of weight to use
-
-    Returns:
-        removals: List with the indices of the data points that were removed
-    """
-    # Validation of parameters
-    assert col in ['original', 'relative', 'normal', 'M'], \
-            "col must be either 'original', 'relative', 'normal', or 'M'"
-
-    # Check whether it makes sense to attack this model
-    try:
-        original_model.df.loc[feature]
-    except KeyError:
-        raise ValueError(f'The feature "{feature}" is already not present in the original model')
-
-    # Define the base set from which we remove one feature at a time.
-    # Initially it's a copy of the given training set.
-    X_base = X_train.copy()
-    y_base = y_train.copy()
-
-    # The list with the points we remove from the training set
-    removals = []
-
-    iteration = 0
-    # Stop when we remove half the training points (or if the goal is achieved inside the while loop)
-    while iteration < X_train.shape[0] / 2:
-        print(f'Iteration {iteration}')
-        sys.stdout.flush()
-
-        # Instantiate DataFrame to put results in
-        res = pd.DataFrame(dtype=float, columns=[col])
-
-        # Iterate over all points over the base set (which we want to remove)
-        for ith_point, _ in tqdm(X_base.iterrows(),
-                                 total=X_base.shape[0],
-                                 position=0,
-                                 leave=True):
-
-            # Create dataset without i-th point
-            X_no_i = X_base.drop(index=ith_point)
-            y_no_i = y_base.drop(index=ith_point)
-
-            # Fit model to reduced dataset
-            model = SRR.new_model_with_same_params_as(original_model)
-            try:
-                model.fit(one_hot_encode(X_no_i), y_no_i, verbose=False)
-            except ValueError:
-                # This error happens when there are no samples of some class in the training set
-                # In this case, we break the loop
-                print("Could not achieve goal...")
-                return removals
-
-            # Try to retrieve values of interest
-            try:
-                res.loc[ith_point] = model.df.loc[feature, col].mean()
-            except KeyError:
-                # If we could not access the weight, then we have successfully removed the feature
-                print(f'Successfully removed feature {feature}!')
-                return removals + [ith_point]
-
-        # Here we just keep the point which brings us closer to zero
-        best_point = res[col].abs().idxmin()
-
-        # Add the best point to our list of removals
-        removals.append(best_point)
-
-        # Check if we have achieved our goal, and if so, return list of removals
-        if np.isnan(res.loc[best_point, col]):
-            return removals
-
-        # If we haven't achieved the goal, remove the current best point from the base set and restart
-        X_base.drop(index=best_point, inplace=True)
-        y_base.drop(index=best_point, inplace=True)
-
-        print(f'Best point {best_point} with {col} values {res.loc[best_point].values}')
-        sys.stdout.flush()
-
-        iteration += 1
-
-    print("Could not achieve goal...")
+    print("Could not achieve goal :(")
     return removals

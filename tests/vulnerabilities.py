@@ -28,6 +28,7 @@ class TestVulnerabilities(unittest.TestCase):
 
         self.assertGreater(adversaries.shape[0], 0)
 
+
     def test_binned_features_pass_monotonicity_no_binned_features(self):
         X, y = mock_dataset()
 

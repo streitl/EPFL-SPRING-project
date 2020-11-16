@@ -169,7 +169,7 @@ def one_hot_encode(df, sep='~'):
     
     Args:
         df : DataFrame to one-hot encode
-        sep: String to be used for the construction of the MultiIndex, can't belong to the columns
+        sep: String to be used for the construction of the MultiIndex, can't appear in the columns
     
     Returns:
         new_df: DataFrame with a MultiIndex column index, containing only binary features
@@ -184,6 +184,34 @@ def one_hot_encode(df, sep='~'):
     new_df.columns = pd.MultiIndex.from_tuples([c.split(sep) for c in new_df.columns])
     
     return new_df
+
+
+def one_hot_encode_pair(X_train, X_test, sep='~'):
+    """
+    1-hot encodes a pair of DataFrames, while forcing the second to have exactly the same columns as the first.
+
+    Args:
+        X_test : First DataFrame to encode, serves as the 'base'
+        X_train: Second DataFrame to encode, some columns might be added/dropped
+        sep    : String to be used for the construction of the MultiIndex, can't appear in the columns
+
+    Returns:
+        X_train_one_hot: 1-hot encoded version of X_train
+        X_test_one_hot : 1-hot encoded version of X_test
+    """
+    # First, 1-hot encode both DataFrames
+    X_train_one_hot = one_hot_encode(X_train, sep)
+    X_test_one_hot = one_hot_encode(X_test, sep)
+
+    # Then create a 0 entry in X_test for all columns in X_train but not X_test
+    for col in X_train_one_hot.columns:
+        if col not in X_test_one_hot.columns:
+            X_test_one_hot[col] = 0
+
+    # Remove any columns that might be in X_test but not X_train
+    X_test_one_hot = X_test_one_hot[X_train_one_hot.columns]
+
+    return X_train_one_hot, X_test_one_hot
 
 
 def processing_pipeline(X, y, train_size=0.9, seed=100, nbins=3):
