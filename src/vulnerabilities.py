@@ -28,7 +28,7 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
                                  and the corresponding original datapoints
     """
     # Keep track of which features can be modified
-    modifiable_features = set(srr_model.selected_features).intersection(set(can_change))
+    modifiable_features = set(srr_model.features).intersection(set(can_change))
     assert len(modifiable_features) > 0, "No features can be modified with the given parameters"
     
     # Create model predictions
@@ -36,7 +36,7 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
     
     # Only keep data points whose label was correctly predicted,
     # and only keep the features selected by the SRR model
-    correctly_classified = X.loc[y_pred == y, srr_model.selected_features]
+    correctly_classified = X.loc[y_pred == y, srr_model.features]
     
     # Append label column to datapoints
     correctly_classified['label~original'] = y[y_pred == y]
@@ -78,7 +78,7 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
     ]
     
     # Join the true adversaries with the corresponding datapoints to see what changed
-    adversaries_and_originals = pd.merge(true_adversaries, X[srr_model.selected_features],
+    adversaries_and_originals = pd.merge(true_adversaries, X[srr_model.features],
          left_index=True, right_index=True,
          suffixes=['~adversarial', '~original'])
     
@@ -201,12 +201,14 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
         # This is the SRR weight that we want to change
         original_weight = original_srr.get_weight(feature, category)
 
+        # Check if weight is defined
+        if np.isnan(original_weight):
+            raise ValueError('The weight is does not exist in the model.')
         # Check whether the original weight is already 0
         if original_weight == 0 and goal == 'flip_sign':
             raise ValueError('Cannot flip weight sign of feature with weight 0.')
         if original_weight == 0 and goal == 'nullify':
-            print('The weight is already null. Stopping.')
-            return []
+            raise ValueError('The weight is already null and cannot be nullified. Stopping.')
 
         if original_weight > 0:
             print(f'Original weight is positive ({original_weight:.0f}), so we want it to decrease.')
@@ -233,7 +235,7 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
         if goal in ['flip_sign', 'nullify']:
             res = pd.DataFrame(dtype=float, columns=[col, 'M'])
         else:
-            res = pd.DataFrame(dtype=float, columns=[col])
+            res = pd.DataFrame(dtype=float, columns=[col, 'M'])
 
         # Iterate over all points over the base set (which we want to remove)
         for ith_point, _ in tqdm(X_base.iterrows(), total=X_base.shape[0], leave=True, position=0):
@@ -257,25 +259,30 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
                 try:
                     res.loc[ith_point] = model.df.loc[(feature, category)][[col, model.M]].values
                 except KeyError:
-                    print(f'Model had no weights when removing {removals} and {ith_point}')
                     res.loc[ith_point] = (np.nan, np.nan)
             elif goal == 'remove_feature':
                 if feature in model.features:
-                    res.loc[ith_point] = model.df.loc[feature, col].abs().mean()
+                    res.loc[ith_point] = model.df.loc[feature, [col, model.M]].abs().mean().values
                 else:
                     # The feature is not present in the alternate model so we notify this with a NaN
-                    res.loc[ith_point] = np.nan
+                    res.loc[ith_point] = (np.nan, np.nan)
 
-        # Find which point brings us closer to our goal (or achieves it)
+        # If we could not get any weights for the model in these two cases, abandon
+        if goal in ['flip_sign', 'nullify'] and res.isna().all().all():
+            raise ValueError(f'Attack failed, feature was not present in any model. Tried removals: {removals}')
+
+        # Find which point brings us closer to our goal or achieves it (on the alternative model)
         if goal == 'flip_sign':
             # In this case we want the point which brings us closer to the opposite sign of the original weight
+            # To do so, we keep the points with the best rounded weights, and then take the best according to 'col'
             if original_weight > 0:
-                best_point = res[col].idxmin()
+                best_point = res.loc[res.M == res.M.min(), col].idxmin()
             else:
-                best_point = res[col].idxmax()
+                best_point = res.loc[res.M == res.M.max(), col].idxmax()
         elif goal == 'nullify':
             # In this case we are looking for the point that brings us closer to 0
-            best_point = res[col].abs().idxmin()
+            # We first get the rounded weights with smallest abs, then the best according to 'col'
+            best_point = res.loc[res.M.abs() == res.M.abs().min(), col].abs().idxmin()
         else: # goal == 'remove_feature':
             # If some data point caused a feature removal
             if res[col].isna().any():
@@ -283,7 +290,8 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
                 best_point = res[res[col].isna()].index[0]
             else:
                 # Otherwise we keep the point which brings us closer to zero
-                best_point = res[col].abs().idxmin()
+                # Again, we first get the rounded weights with smallest abs, then the best according to 'col'
+                best_point = res.loc[res.M.abs() == res.M.abs().min(), col].abs().idxmin()
 
         # Add the best point to our list of removals
         removals.append(best_point)
@@ -305,12 +313,18 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
             return removals
 
         if goal in ['flip_sign', 'nullify']:
-            s = srr.df.loc[(feature, category), [col, srr.M]]
-            print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
+            try:
+                s = srr.df.loc[(feature, category), [col, srr.M]]
+                print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
+            except KeyError:
+                print(f'Iteration {iteration}: removed {best_point}, got no weights (feature not in model)', end='')
         else:
-            s = srr.df.loc[feature, [col, srr.M]].abs().mean()
-            print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
+            try:
+                s = srr.df.loc[feature, [col, srr.M]].abs().mean()
+                print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
+            except KeyError:
+                print(f'Iteration {iteration}: removed {best_point}, got no weights (feature not in model)', end='')
         sys.stdout.flush()
 
-    print("Could not achieve goal :(")
-    return removals
+
+    raise ValueError(f'Attack failed, removed too many points. Tried removals: {removals}')

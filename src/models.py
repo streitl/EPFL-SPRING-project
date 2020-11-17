@@ -19,6 +19,10 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
     An sklearn estimator with rounded weights.
     Used as a super class that the SRR model and its approximations can extend from.
     """
+    def name(self):
+        raise NotImplemented
+
+
     def __init__(self, M):
         """
         Initializes M, and also creates some attributes needed for all subclasses.
@@ -121,7 +125,7 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
             column  : Determines which weight to get
 
         Returns:
-            The weight of the feature corresponding to feature, category, column
+            The weight of the feature corresponding to feature, category, column, or nan if it does not exist
         """
         assert column in ['original', 'relative', 'normal', 'M'], \
             "column must be either 'original', 'relative', 'normal', or 'M'"
@@ -130,8 +134,8 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
                 return self.df.loc[(feature, category), self.M]
             else:
                 return self.df.loc[(feature, category), column]
-        except:
-            raise ValueError(f'The model does not have weights for ({feature}, {category}) in column {column}')
+        except KeyError:
+            return np.nan
 
 
     def __contains__(self, feature):
@@ -147,6 +151,14 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
 
 
 
+    def __str__(self):
+        return f"{self.name()} [k={len(self.features)}, M={self.M}]" \
+               f"\n\n" \
+               f"{self.df[self.M].drop(('bias', '')).reset_index().rename(columns={self.M: 'Score'}).to_string(index=False)}" \
+               f"\n\n" \
+               f"Predict class 1 if sum of scores is >= {self.df.loc[('bias', ''), self.M]:.0f}, otherwise predict 0."""
+
+
 class SRR(RoundedWeightClassifier):
     """
     An sklearn BaseEstimator implementing the Select-Regress-Round model.
@@ -154,6 +166,8 @@ class SRR(RoundedWeightClassifier):
     Extends from RoundedWeightClassifier, which defines how to build the DataFrame with the features,
     and how to do the prediction.
     """
+    def name(self):
+        return 'Select-Regress-Round (SRR)'
 
     def __init__(self, k, M, cv=5, Cs=20, n_jobs=-1, max_iter=150, random_state=42):
         """
@@ -291,6 +305,9 @@ class RoundedLogisticRegression(RoundedWeightClassifier):
     It should produce predictions very similar to that of SRR, even when removing some points from the training set,
     but the advantage is that the training time of this class is a lot smaller.
     """
+    def name(self):
+        return 'Rounded Logistic Regression'
+
 
     def __init__(self, M, features, C, max_iter, random_state):
         """
@@ -356,6 +373,9 @@ class SRRWithoutCrossValidation(RoundedWeightClassifier):
     It should produce predictions very similar to that of SRR, even when removing some points from the training set,
     but the advantage is that the training time of this class is a lot smaller.
     """
+    def name(self):
+        return 'SRR Without Cross-Validation'
+
 
     def __init__(self, k, M, C, max_iter, random_state):
         """
