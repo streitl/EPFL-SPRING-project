@@ -240,7 +240,7 @@ german_mappings = {
         'A173' : 'skilled employee / official',
         'A174' : 'management/ self-employed/ highly qualified employee/ officer'
     },
-    'Have_telephone': {
+    'Have_Telephone': {
         'A191' : 'none',
         'A192' : 'yes, registered under the customers name'
     },
