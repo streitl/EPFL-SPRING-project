@@ -151,7 +151,9 @@ def binned_features_pass_monotonicity(srr_model, X, y):
     return True
 
 
-def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goal='nullify', col='normal'):
+def poisoning_attack(original_srr, X_train, y_train,
+                     feature, category=None,
+                     goal='nullify', col='normal', use_stats=False):
     """
     Performs a poisoning attack by iteratively removing points from the training set of the given model.
 
@@ -180,6 +182,8 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
         category    : optional (only defined if goal is 'flip_sign' or 'nullify')
         goal        : the goal of the poisoning attack
         col         : which kind of weight to use
+        use_stats   : Boolean indicating whether to use dataset statistics to improve the attack, default is False.
+                        Cannot be set for goal 'remove_feature' (for now)
 
     Returns:
         removals: List with the indices of the data points that were removed
@@ -191,6 +195,8 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
             "col must be either 'original', 'relative', 'normal', or 'M'"
     assert (category is not None) ^ (goal == 'remove_feature'), \
         "category can only be None if goal is 'remove_feature'"
+    assert (use_stats) ^ (goal == 'remove_feature'), \
+        "cannot use statistics if goal is 'remove_feature'"
 
     if col == 'M':
         col = original_srr.M
@@ -219,6 +225,17 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
         # We approximate SRR by a version without cross-validation in this case
         model_kind = SRRWithoutCrossValidation
 
+
+    # Define the set of candidate points to remove
+    if use_stats:
+        # Only consider points which have the specified (feature, category) and are associated to the label
+        # This means that if the original weight is negative, we will only try to remove points that have label 0
+        #  in order to push the classifier to believe that the category is not associated to a negative label
+        candidates = list(y_train[(X_train[feature] == category) & (y_train == int(original_weight > 0))].index)
+    else:
+        # If we don't use stats, the set of candidate points is the whole training set
+        candidates = list(y_train.index)
+
     # Define the base set from which we remove one feature at a time.
     # Initially it's a copy of the given training set.
     X_base = X_train.copy()
@@ -230,15 +247,15 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
     srr = original_srr
     iteration = 0
     # Stop when we remove half the training points (or if the goal is achieved inside the while loop)
-    while iteration < X_train.shape[0] / 2:
+    while iteration < X_train.shape[0] / 2 and len(candidates) > 0:
         # Instantiate DataFrame to put results in
         if goal in ['flip_sign', 'nullify']:
             res = pd.DataFrame(dtype=float, columns=[col, 'M'])
         else:
             res = pd.DataFrame(dtype=float, columns=[col, 'M'])
 
-        # Iterate over all points over the base set (which we want to remove)
-        for ith_point, _ in tqdm(X_base.iterrows(), total=X_base.shape[0], leave=True, position=0):
+        # Iterate over all points over the candidate set (which we want to remove)
+        for ith_point in tqdm(candidates, leave=True, position=0):
 
             # Create dataset without i-th point
             X_no_i = X_base.drop(index=ith_point)
@@ -293,8 +310,9 @@ def poisoning_attack(original_srr, X_train, y_train, feature, category=None, goa
                 # Again, we first get the rounded weights with smallest abs, then the best according to 'col'
                 best_point = res.loc[res.M.abs() == res.M.abs().min(), col].abs().idxmin()
 
-        # Add the best point to our list of removals
+        # Add the best point to our list of removals and remove it from set of candidates
         removals.append(best_point)
+        candidates.remove(best_point)
         iteration += 1
 
         # Remove the current best point from the base set
