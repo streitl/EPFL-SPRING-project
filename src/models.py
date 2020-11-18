@@ -156,7 +156,9 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
                f"\n\n" \
                f"{self.df[self.M].drop(('bias', '')).reset_index().rename(columns={self.M: 'Score'}).to_string(index=False)}" \
                f"\n\n" \
-               f"Predict class 1 if sum of scores is >= {-self.df.loc[('bias', ''), self.M]:.0f}, otherwise predict 0."""
+               f"Model's bias: {self.df.loc[('bias', ''), self.M]:.0f}" \
+               f"\n\n" \
+               f"Predict class 1 if sum of scores and bias is >= 0, otherwise predict 0."
 
 
 class SRR(RoundedWeightClassifier):

@@ -20,10 +20,10 @@ class TestSRRMethods(unittest.TestCase):
         model = models.SRR(k=1, M=2, Cs=100)
         model.fit(one_hot_encode(X), y)
 
-        self.assertIn('height', model.selected_features)
+        self.assertIn('height', model.features)
         self.assertGreater(model.get_weight('height', 'L'), 0)
 
-        self.assertEqual(set(model.df.index.levels[0]) - {'bias'}, set(model.selected_features))
+        self.assertEqual(set(model.df.index.levels[0]) - {'bias'}, set(model.features))
 
 
     def test_save_load(self):
@@ -44,7 +44,7 @@ class TestSRRMethods(unittest.TestCase):
         self.assertEqual(model.max_iter, model_new.max_iter)
         self.assertEqual(model.random_state, model_new.random_state)
 
-        self.assertEqual(model.selected_features, model_new.selected_features)
+        self.assertEqual(model.features, model_new.features)
         self.assertTrue((model.df == model_new.df).all().all())
 
 
