@@ -92,16 +92,16 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
 
 
 
-def binned_features_pass_monotonicity(srr_model, X, y):
+def binned_features_pass_monotonicity(srr, X, y):
     """
     Takes a trained SRR model, and for each selected feature whose categories are intervals (and possibly nan),
     checks that the weights corresponding to the intervals are either in increasing or decreasing order, and see if
     this non-monotonicity allows to find adversarial examples.
     
     Args:
-        srr_model: Trained SRR model
-        X        : DataFrame with the features
-        y        : DataFrame with the label
+        srr: Trained SRR model
+        X  : DataFrame with the features
+        y  : DataFrame with the label
     
     Returns:
         Boolean indicating whether the binned features of the model pass monotonicity check
@@ -110,10 +110,10 @@ def binned_features_pass_monotonicity(srr_model, X, y):
     non_monotonic_features = set()
     
     # Iterate over all features that the model uses
-    for feature in srr_model.df.index.levels[0]:
+    for feature in srr.df.index.levels[0]:
         
         # Retrieve the categories corresponding to this feature
-        categories = srr_model.df.loc[feature].index
+        categories = srr.df.loc[feature].index
         
         # Intervals are of the form '(left, right]'
         if categories.str.startswith("(").any():
@@ -122,7 +122,7 @@ def binned_features_pass_monotonicity(srr_model, X, y):
             non_na_categories = categories[categories != 'nan']
             
             # Retrieve original weights of the model (as a Series)
-            weights = srr_model.df.loc[feature].loc[non_na_categories, srr_model.M]
+            weights = srr.df.loc[feature].loc[non_na_categories, srr.M]
             
             # Indicators of whether the weights have already increased/decreased so far
             increased, decreased = False, False
@@ -137,13 +137,13 @@ def binned_features_pass_monotonicity(srr_model, X, y):
                 # If both are true, then the feature is monotonic
                 if increased and decreased:
                     non_monotonic_features.add(feature)
-    
+
     # If all features are monotonic then the test is passed
     if len(non_monotonic_features) == 0:
         return True
         
     # Look for adversarial examples by changing only the features that are non-monotonic, one at a time
-    adversarial_examples = find_adversarial_examples(srr_model, X, y, can_change=non_monotonic_features,
+    adversarial_examples = find_adversarial_examples(srr, X, y, can_change=non_monotonic_features,
                                                      unit_changes=True, allow_nan=False)
     
     if adversarial_examples.shape[0] > 0:
@@ -194,8 +194,8 @@ def poisoning_attack(original_srr, X_train, y_train,
     assert col in ['original', 'relative', 'normal', 'M'], \
             "col must be either 'original', 'relative', 'normal', or 'M'"
     assert (category is not None) ^ (goal == 'remove_feature'), \
-        "category can only be None if goal is 'remove_feature'"
-    assert (use_stats) ^ (goal == 'remove_feature'), \
+        "category can only be None if and only if goal is 'remove_feature'"
+    assert not (use_stats and goal == 'remove_feature'), \
         "cannot use statistics if goal is 'remove_feature'"
 
     if col == 'M':
@@ -231,6 +231,7 @@ def poisoning_attack(original_srr, X_train, y_train,
         # Only consider points which have the specified (feature, category) and are associated to the label
         # This means that if the original weight is negative, we will only try to remove points that have label 0
         #  in order to push the classifier to believe that the category is not associated to a negative label
+        # This can work to bring the feature to 0 or to make it flip sign
         candidates = list(y_train[(X_train[feature] == category) & (y_train == int(original_weight > 0))].index)
     else:
         # If we don't use stats, the set of candidate points is the whole training set
@@ -247,7 +248,7 @@ def poisoning_attack(original_srr, X_train, y_train,
     srr = original_srr
     iteration = 0
     # Stop when we remove half the training points (or if the goal is achieved inside the while loop)
-    while iteration < X_train.shape[0] / 2 and len(candidates) > 0:
+    while iteration < X_train.shape[0] * 0.75 and len(candidates) > 0:
         # Instantiate DataFrame to put results in
         if goal in ['flip_sign', 'nullify']:
             res = pd.DataFrame(dtype=float, columns=[col, 'M'])
