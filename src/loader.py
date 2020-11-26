@@ -291,17 +291,18 @@ def load_ieeecis():
     identity.id_31 = identity.id_31.str.replace(' ?[0-9]+(.[0-9]+)?', '')
     # Also remove the word generic (helps merging some groups)
     identity.id_31 = identity.id_31.str.replace(' ?generic', '')
-    # Only keep frequent values, turn the other into NaNs
-    id_31_counts = identity.id_31.value_counts()
-    identity.id_31 = identity.id_31.map(lambda i: i if id_31_counts[i] > 200 else np.nan,
-                                        na_action='ignore')
-    
+    # Only keep frequent values, turn the others into 'other'
+    id_31_counts = identity.id_31.value_counts(dropna=False)
+    identity.id_31 = identity.id_31.map(lambda i: i if id_31_counts[i] > 200 else 'other')
+
     # Remove version number from OS info
     identity.id_30 = identity.id_30.str.replace(' ?[0-9]+([._][0-9]+){0,2}', '')
     
     # We need the joined result
     combined_df = pd.merge(transaction, identity, on="TransactionID", how="left")
     combined_df.set_index('TransactionID', inplace=True)
+    combined_df.id_30.fillna('unknown', inplace=True)
+    combined_df.id_31.fillna('unknown', inplace=True)
     
     # Divide into features and label
     X = combined_df.drop(columns=["isFraud"])
