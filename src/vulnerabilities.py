@@ -6,7 +6,7 @@ import numpy as np
 from tqdm import tqdm
 from itertools import product
 
-from .preprocessing import one_hot_encode
+from .preprocessing import one_hot_encode, processing_pipeline
 from .models import SRR, RoundedLogisticRegression, SRRWithoutCrossValidation
 
 
@@ -68,19 +68,19 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
             potential_adversaries = potential_adversaries.append(deformed)
     
     # Get the model prediction for the adversaries
-    potential_adversaries['label~adversarial'] = srr_model.predict(
+    potential_adversaries['label~new'] = srr_model.predict(
         one_hot_encode(potential_adversaries.drop(columns=['label~original']))
     )
     
     # Only keep those which changed the prediction label
     true_adversaries = potential_adversaries.loc[
-         potential_adversaries['label~adversarial'] != potential_adversaries['label~original']
+         potential_adversaries['label~new'] != potential_adversaries['label~original']
     ]
     
     # Join the true adversaries with the corresponding datapoints to see what changed
     adversaries_and_originals = pd.merge(true_adversaries, X[srr_model.features],
          left_index=True, right_index=True,
-         suffixes=['~adversarial', '~original'])
+         suffixes=['~new', '~original'])
     
     # Organise the results in a multi index to easily retrieve original and adversarial info
     adversaries_and_originals.columns = pd.MultiIndex.from_tuples(
@@ -151,9 +151,9 @@ def binned_features_pass_monotonicity(srr, X, y):
     return True
 
 
-def poisoning_attack(original_srr, X_train, y_train,
-                     feature, category=None,
-                     goal='nullify', col='normal', use_stats=False):
+def poisoning_attack_point_removal(original_srr, X_train, y_train,
+                                   feature, category=None,
+                                   goal='nullify', col='normal', use_stats=False):
     """
     Performs a poisoning attack by iteratively removing points from the training set of the given model.
 
@@ -345,5 +345,73 @@ def poisoning_attack(original_srr, X_train, y_train,
                 print(f'Iteration {iteration}: removed {best_point}, got no weights (feature not in model)', end='')
         sys.stdout.flush()
 
-
     raise ValueError(f'Attack failed, removed too many points. Tried removals: {removals}')
+
+
+def poisoning_attack_hyperparameters(original_srr, X, y,
+                                     feature, category=None,
+                                     goal='remove_feature',
+                                     train_size_list=None, seed_list=None, nbins_list=None, cv_list=None,
+                                     Cs_list=None, max_iter_list=None, random_state_list=None):
+    """
+    Tries all possible tuples of hyper-parameters given the argument lists, and returns a dictionary with the
+    first such tuple that achieved the goal, or None if the goal was never achieved
+
+    Args:
+        original_srr     : pre-trained SRR model on the given dataset
+        X                : DataFrame with features, before any processing
+        y                : Series with labels
+        feature          : feature of the model to poison
+        category         : optional (only defined if goal is 'flip_sign' or 'nullify')
+        goal             : the goal of the poisoning attack
+        train_size_list  : list of possible values for the train split size (fraction of entire data)
+        seed_list        : list of possible values for the train/test split seed
+        nbins_list       : list of possible values for the number of bins to discretize numerical features into
+        cv_list          : list of possible values for the parameter cv (number of cross-validation folds)
+        Cs_list          : list of possible values for the parameter Cs (number of regularization values to try)
+        max_iter_list    : list of possible values for the parameter max_iter
+        random_state_list: list of possible values for the parameter random_state
+    Returns:
+        A dictionary
+    """
+    assert goal in ['flip_sign', 'remove_feature', 'nullify'], \
+        "goal must be either 'flip_sign', 'remove_feature', or 'nullify'"
+
+    assert (category is not None) ^ (goal == 'remove_feature'), \
+        "category can only be None if and only if goal is 'remove_feature'"
+
+    assert train_size_list is not None, 'train_size_list must be defined'
+    assert seed_list is not None, 'seed_list must be defined'
+    assert nbins_list is not None, 'nbins_list must be defined'
+    assert cv_list is not None, 'cv_list must be defined'
+    assert Cs_list is not None, 'Cs_list must be defined'
+    assert max_iter_list is not None, 'max_iter_list must be defined'
+    assert random_state_list is not None, 'random_state_list must be defined'
+
+    assert len(train_size_list) > 0, 'train_size_list must have at least one element'
+    assert len(seed_list) > 0, 'seed_list must have at least one element'
+    assert len(nbins_list) > 0, 'n_bins_list must have at least one element'
+    assert len(cv_list) > 0, 'cv_list must have at least one element'
+    assert len(Cs_list) > 0, 'Cs_list must have at least one element'
+    assert len(max_iter_list) > 0, 'max_iter_list must have at least one element'
+    assert len(random_state_list) > 0, 'random_state_list must have at least one element'
+
+    for train_size, seed, nbins in tqdm(product(train_size_list, seed_list, nbins_list),
+                                        total=len(train_size_list) * len(seed_list) * len(nbins_list)):
+
+        X_train, _, y_train, _ = processing_pipeline(X, y, train_size=train_size, seed=seed, nbins=nbins)
+
+        for cv, Cs, m_i, r_s in product(cv_list, Cs_list, max_iter_list, random_state_list):
+            srr = SRR(k=original_srr.k, M=original_srr.M, cv=cv, Cs=Cs, max_iter=m_i, random_state=r_s)
+            srr.fit(one_hot_encode(X_train), y_train)
+
+            if (goal == 'flip_sign' and srr.get_weight(feature, category)
+                                        * original_srr.get_weight(feature, category) < 0) \
+                    or (goal == 'remove_feature' and feature not in srr) \
+                    or (goal == 'nullify' and srr.get_weight(feature, category) == 0):
+
+                print(f'Achieved goal! Resulting model:\n{srr}')
+                return {'k': srr.k, 'M': srr.M, 'train_size': train_size, 'seed': seed, 'nbins': nbins,
+                        'cv': cv, 'Cs': Cs, 'max_iter': m_i, 'random_state': r_s}
+
+    return None

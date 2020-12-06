@@ -57,8 +57,10 @@ class TestVulnerabilities(unittest.TestCase):
         model = SRR(k=1, M=2, cv=2, Cs=100)
         model.fit(one_hot_encode(X_binned), y)
 
-        self.assertRaises(ValueError, vul.poisoning_attack, model, X_binned, y, 'wind_speed', 'H', goal='flip_sign')
-        self.assertRaises(ValueError, vul.poisoning_attack, model, X_binned, y, 'wind_speed', 'S', goal='flip_sign')
+        self.assertRaises(ValueError, vul.poisoning_attack_point_removal, model, X_binned, y,
+                          'wind_speed', 'H', goal='flip_sign')
+        self.assertRaises(ValueError, vul.poisoning_attack_point_removal, model, X_binned, y,
+                          'wind_speed', 'S', goal='flip_sign')
 
 
     def test_poisoning_attack_nullify(self):
@@ -68,7 +70,7 @@ class TestVulnerabilities(unittest.TestCase):
         model.fit(one_hot_encode(X), y)
 
         for cat in ['H', 'S']:
-            removals = vul.poisoning_attack(model, X, y, 'wind_speed', cat, goal='nullify', use_stats=True)
+            removals = vul.poisoning_attack_point_removal(model, X, y, 'wind_speed', cat, goal='nullify', use_stats=True)
 
             poisoned = SRR.copy_params(model)
             poisoned.fit(one_hot_encode(X.drop(removals)), y.drop(removals))
@@ -82,7 +84,7 @@ class TestVulnerabilities(unittest.TestCase):
         model = SRR(k=1, M=2, cv=2, Cs=100)
         model.fit(one_hot_encode(X), y)
 
-        removals = vul.poisoning_attack(model, X, y, 'wind_speed', goal='remove_feature')
+        removals = vul.poisoning_attack_point_removal(model, X, y, 'wind_speed', goal='remove_feature')
 
         poisoned = SRR.copy_params(model)
         poisoned.fit(one_hot_encode(X.drop(removals)), y.drop(removals))
