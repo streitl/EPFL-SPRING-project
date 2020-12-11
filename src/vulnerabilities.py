@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 from tqdm import tqdm
-from itertools import product
+from itertools import product, combinations, chain
 
 from .preprocessing import one_hot_encode, processing_pipeline
 from .models import SRR, RoundedLogisticRegression, SRRWithoutCrossValidation
@@ -194,7 +194,7 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
     assert col in ['original', 'relative', 'normal', 'M'], \
             "col must be either 'original', 'relative', 'normal', or 'M'"
     assert (category is not None) ^ (goal == 'remove_feature'), \
-        "category can only be None if and only if goal is 'remove_feature'"
+        "either goal is 'remove_feature' or category is not None"
     assert not (use_stats and goal == 'remove_feature'), \
         "cannot use statistics if goal is 'remove_feature'"
 
@@ -216,14 +216,12 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
         if original_weight == 0 and goal == 'nullify':
             raise ValueError('The weight is already null and cannot be nullified. Stopping.')
 
-        if original_weight > 0:
-            print(f'Original weight is positive ({original_weight:.0f}), so we want it to decrease.')
-        else:
-            print(f'Original weight is negative ({original_weight:.0f}), so we want it to increase.')
-        sys.stdout.flush()
     else: # goal == 'remove_feature'
         # We approximate SRR by a version without cross-validation in this case
         model_kind = SRRWithoutCrossValidation
+
+        if feature not in original_srr:
+            raise ValueError('The given feature is already not in the model. Stopping.')
 
 
     # Define the set of candidate points to remove
@@ -250,10 +248,7 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
     # Stop when we remove half the training points (or if the goal is achieved inside the while loop)
     while iteration < X_train.shape[0] * 0.75 and len(candidates) > 0:
         # Instantiate DataFrame to put results in
-        if goal in ['flip_sign', 'nullify']:
-            res = pd.DataFrame(dtype=float, columns=[col, 'M'])
-        else:
-            res = pd.DataFrame(dtype=float, columns=[col, 'M'])
+        res = pd.DataFrame(dtype=float, columns=[col, 'M'])
 
         # Iterate over all points over the candidate set (which we want to remove)
         for ith_point in tqdm(candidates, leave=True, position=0):
@@ -331,20 +326,6 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
             print('\nAttack successful! :D')
             return removals
 
-        if goal in ['flip_sign', 'nullify']:
-            try:
-                s = srr.df.loc[(feature, category), [col, srr.M]]
-                print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
-            except KeyError:
-                print(f'Iteration {iteration}: removed {best_point}, got no weights (feature not in model)', end='')
-        else:
-            try:
-                s = srr.df.loc[feature, [col, srr.M]].abs().mean()
-                print(f'Iteration {iteration}: removed {best_point}, got weights: {s.index.values}, {s.values}', end='')
-            except KeyError:
-                print(f'Iteration {iteration}: removed {best_point}, got no weights (feature not in model)', end='')
-        sys.stdout.flush()
-
     raise ValueError(f'Attack failed, removed too many points. Tried removals: {removals}')
 
 
@@ -413,5 +394,167 @@ def poisoning_attack_hyperparameters(original_srr, X, y,
                 print(f'Achieved goal! Resulting model:\n{srr}')
                 return {'k': srr.k, 'M': srr.M, 'train_size': train_size, 'seed': seed, 'nbins': nbins,
                         'cv': cv, 'Cs': Cs, 'max_iter': m_i, 'random_state': r_s}
+
+    return None
+
+
+def poisoning_attack_drop_columns(original_srr, X_train, y_train,
+                                  feature, category=None,
+                                  goal='remove_feature',
+                                  col='normal',
+                                  greedy=True,
+                                  assume_selection=True):
+    """
+    An attack consisting of removing columns from the training set of the model in order to achieve some goal.
+    Can be greedy, in which case we remove one feature at a time, the one that brings us closer to our goal
+    (very similar to the point removal attack), or can be extensive, in each case we try each possible
+    subset of columns and train a model on them.
+
+    Many different kinds of weights can be used, determined by the 'col' param:
+        'original': from the inner logistic regression model (recommended for 'nullify' and 'remove_feature')
+        'relative': from the SRR model right before multiplication by M and rounding
+                        (not recommended, if weight is the biggest/smallest, then likely no changes)
+        'normal'  : from the inner logistic regression model but normalized (recommended for 'flip_sign')
+        'M'       : from the SRR model (not recommended, likely no changes)
+
+    Args:
+        original_srr    : pre-trained SRR model on the given dataset
+        X_train         : training set DataFrame with the features, binned but not 1-hot encoded
+        y_train         : training set Series with the labels
+        feature         : feature of the model to poison
+        category        : optional (only defined if goal is 'flip_sign' or 'nullify')
+        col             : which kind of weight to use
+        goal            : the goal of the poisoning attack
+        greedy          : boolean saying if we should remove columns greedily (one at a time) or using the power-set
+        assume_selection: boolean indicating whether we believe that removing a feature not chosen by the
+                            model will have an influence (False) or not (True) on the new selection (only works in
+                            non-greedy attack)
+    Returns:
+        removals: a list with the name of the columns that we removed
+    """
+    assert goal in ['flip_sign', 'remove_feature', 'nullify'], \
+        "goal must be either 'flip_sign', 'remove_feature', or 'nullify'"
+    assert col in ['original', 'relative', 'normal', 'M'], \
+            "col must be either 'original', 'relative', 'normal', or 'M'"
+    assert (category is not None) ^ (goal == 'remove_feature'), \
+        "either goal is 'remove_feature' or category is not None"
+
+    k = original_srr.k
+    n = len(X_train.columns)
+
+    if greedy:
+        if goal in ['flip_sign', 'nullify']:
+            # This is the SRR weight that we want to change
+            original_weight = original_srr.get_weight(feature, category)
+
+            # Check if weight is defined
+            if np.isnan(original_weight):
+                raise ValueError('The weight is does not exist in the model.')
+            # Check whether the original weight is already 0
+            if original_weight == 0 and goal == 'flip_sign':
+                raise ValueError('Cannot flip weight sign of feature with weight 0.')
+            if original_weight == 0 and goal == 'nullify':
+                raise ValueError('The weight is already null and cannot be nullified.')
+
+        else: # goal == 'remove_feature'
+            if feature not in original_srr:
+                raise ValueError('The given feature is already not in the model.')
+
+
+        # The list with the columns we remove from the training set
+        removals = []
+
+        # Stop when there are only k features remaining, or if we achieved the goal before
+        while len(removals) < n - k - 1:
+            # Instantiate DataFrame to put results in
+            res = pd.DataFrame(dtype=float, columns=[col, 'M'])
+
+            for column in tqdm(X_train.drop(columns=removals+[feature]).columns, leave=False):
+                X_reduced = X_train.drop(columns=removals+[column])
+
+                # Fit SRR on the training set without the new colums
+                srr = SRR.copy_params(original_srr)
+                srr.fit(one_hot_encode(X_reduced), y_train)
+
+                # If the goal is achieved, stop
+                if (goal == 'flip_sign' and srr.get_weight(feature, category)
+                    * original_srr.get_weight(feature, category) < 0) \
+                        or (goal == 'remove_feature' and feature not in srr) \
+                        or (goal == 'nullify' and srr.get_weight(feature, category) == 0):
+                    removals.append(column)
+                    print(f'Attack successful! Removals:\n{removals}\n\nResulting model:\n{srr}')
+                    return removals
+
+
+                if goal in ['flip_sign', 'nullify']:
+                    try:
+                        res.loc[column] = srr.df.loc[(feature, category)][[col, srr.M]].values
+                    except KeyError:
+                        res.loc[column] = (np.nan, np.nan)
+                elif goal == 'remove_feature':
+                    res.loc[column] = srr.df.loc[feature, [col, srr.M]].abs().mean().values
+
+            # Pick the best column and add it to the list of removals
+            if goal == 'flip_sign':
+                # In this case we want the column which brings us closer to the opposite sign of the original weight
+                # To do so, we keep the columns with the best rounded weights, and then take the best according to 'col'
+                if original_weight > 0:
+                    best_col = res.loc[res.M == res.M.min(), col].idxmin()
+                else:
+                    best_col = res.loc[res.M == res.M.max(), col].idxmax()
+            elif goal == 'nullify':
+                # In this case we are looking for the column that brings us closer to 0
+                # We first get the rounded weights with smallest abs, then the best according to 'col'
+                best_col = res.loc[res.M.abs() == res.M.abs().min(), col].abs().idxmin()
+            else:  # goal == 'remove_feature':
+                # We keep the point which brings us closer to zero
+                # Again, we first get the rounded weights with smallest abs, then the best according to 'col'
+                best_col = res.loc[res.M.abs() == res.M.abs().min(), col].abs().idxmin()
+
+            removals.append(best_col)
+
+        print(f'Attack failed, removed too many columns. Tried removals:\n{removals}')
+        return None
+
+    else: # not greedy, iterate over all possible
+        def powerset(it, max_length=None):
+            """Small function that computes the power-set of an iterable minus the empty set, and in reverse order"""
+            if max_length is None:
+                return chain.from_iterable(combinations(it, r) for r in range(len(it), 0, -1))
+            else:
+                return chain.from_iterable(combinations(it, r) for r in range(max_length, 0, -1))
+
+
+        # In this case, always remove at least one feature in the model (other than the one we are attacking)
+        if assume_selection:
+            it = tqdm(
+                list(chain.from_iterable(
+                    product(combinations(pd.Index(original_srr.features).drop(feature), i),
+                            powerset(X_train.columns.drop(original_srr.features), max_length=n-k-i))
+                    for i in range(1, k)
+                    )
+                )
+            )
+        else:
+            it = tqdm(list(powerset(X_train.columns.drop(feature), max_length=n-k)))
+
+        # We define this function once to be able to flatten the removals (which are given in a weird format)
+        flatten = lambda x: [e for l in x for e in l]
+
+        for removals in it:
+            if assume_selection:
+                removals = flatten(removals)
+            else:
+                removals = list(removals)
+
+            srr = SRR.copy_params(original_srr)
+            srr.fit(one_hot_encode(X_train.drop(columns=removals)), y_train)
+
+            if (goal == 'flip_sign' and srr.get_weight(feature, category)
+                * original_srr.get_weight(feature, category) < 0) \
+                    or (goal == 'remove_feature' and feature not in srr) \
+                    or (goal == 'nullify' and srr.get_weight(feature, category) == 0):
+                print(f'Achieved goal! Resulting model:\n{srr}')
+                return removals
 
     return None

@@ -147,7 +147,7 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
         Returns:
             True if feature contained in the model, otherwise false
         """
-        return feature in self.features
+        return feature in self.features and not (self.df.loc[feature] == 0).all().all()
 
 
 
