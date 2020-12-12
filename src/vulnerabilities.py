@@ -246,7 +246,8 @@ def goal_is_achieved(original_srr, poisoned_srr, feature, category, goal):
 
 def poisoning_attack_point_removal(original_srr, X_train, y_train,
                                    feature, category=None,
-                                   goal='nullify', col='normal', use_stats=False):
+                                   goal='nullify', col='normal',
+                                   use_stats=False, use_substitute=True):
     """
     Performs a poisoning attack by iteratively removing points from the training set of the given model.
 
@@ -268,15 +269,16 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
         'M'       : from the SRR model (not recommended, likely no changes)
 
     Args:
-        original_srr: pre-trained SRR model on the given dataset
-        X_train     : training set DataFrame with the features, binned but not 1-hot encoded
-        y_train     : training set Series with the labels
-        feature     : feature of the model to poison
-        category    : optional (only defined if goal is 'flip_sign' or 'nullify')
-        goal        : the goal of the poisoning attack
-        col         : which kind of weight to use
-        use_stats   : Boolean indicating whether to use dataset statistics to improve the attack, default is False.
-                        Cannot be set for goal 'remove_feature' (for now)
+        original_srr  : pre-trained SRR model on the given dataset
+        X_train       : training set DataFrame with the features, binned but not 1-hot encoded
+        y_train       : training set Series with the labels
+        feature       : feature of the model to poison
+        category      : optional (only defined if goal is 'flip_sign' or 'nullify')
+        goal          : the goal of the poisoning attack
+        col           : which kind of weight to use
+        use_stats     : boolean indicating whether to use dataset statistics to improve the attack, default is False.
+                        cannot be set for goal 'remove_feature' (for now)
+        use_substitute: boolean indicating whether to use a substitute model during the attack
 
     Returns:
         removals: List with the indices of the data points that were removed
@@ -350,8 +352,10 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
             X_no_i = X_base.drop(index=ith_point)
             y_no_i = y_base.drop(index=ith_point)
 
-            # Fit alternative model (with same parameters as srr) to reduced dataset
-            model = model_kind.from_srr(srr)
+            if use_substitute:
+                model = model_kind.from_srr(srr)
+            else:
+                model = SRR.copy_params(srr)
             try:
                 model.fit(one_hot_encode(X_no_i), y_no_i)
             except ValueError:
