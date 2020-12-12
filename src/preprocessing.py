@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 from sklearn.model_selection import train_test_split
+from .models import SRR
 
 
 def drop_useless_columns(X):
@@ -242,3 +243,27 @@ def processing_pipeline(X, y, train_size=0.9, seed=100, nbins=3):
     X_train_bin, X_test_bin = bin_features(X_train, X_test, nbins=nbins)
     
     return X_train_bin, X_test_bin, y_train, y_test
+
+
+def train_srr(X, y, params):
+    """
+    Applies the entire preprocessing pipeline on the data, trains an SRR model with the given parameters and returns it.
+
+    Args:
+        X     : DataFrame with the features, not pre-processed
+        y     : Series with the labels
+        params: dictionary of parameters for the preprocessing and the model
+
+    Returns:
+        srr: an SRR model trained on the data
+    """
+
+    X_train, X_test, y_train, y_test = processing_pipeline(X, y, train_size=params['train_size'],
+                                                           seed=params['seed'], nbins=params['nbins'])
+
+    srr = SRR(k=params['k'], M=params['M'],
+              cv=params['cv'], Cs=params['Cs'], max_iter=params['max_iter'], random_state=params['random_state'])
+    srr.fit(one_hot_encode(X_train), y_train,
+            train_size=params['train_size'], seed=params['seed'], nbins=params['nbins'])
+
+    return srr

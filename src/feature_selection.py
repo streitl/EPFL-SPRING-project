@@ -7,7 +7,7 @@ from sklearn.metrics import log_loss
 
 def get_score(sklearn_model, X, y, criterion="AIC"):
     """
-    Unused function for now, kept for posteriority.
+    Unused function for now, kept just in case.
     Computes the AIC or BIC score for an sklearn model by training it on the given data,
     and using the log likelihood of the fit.
 

@@ -207,6 +207,11 @@ class SRR(RoundedWeightClassifier):
             random_state=self.random_state
         )
 
+        # Initialize these parameters
+        self.train_size = None
+        self.seed = None
+        self.nbins = None
+
 
     @staticmethod
     def copy_params(model):
@@ -224,7 +229,7 @@ class SRR(RoundedWeightClassifier):
 
 
     @ignore_warnings(category=ConvergenceWarning)
-    def fit(self, X, y, kind="linear", verbose=0):
+    def fit(self, X, y, train_size=None, seed=None, nbins=None, kind="linear", verbose=0):
         """
         Performs the Select-Regress-Round training procedure:
             1. Using forward stepwise logistic regression, selects the best k features
@@ -233,12 +238,20 @@ class SRR(RoundedWeightClassifier):
         At the end, the trained model is stored and represented in self.df
         
         Args:
-            X      : DataFrame with the features, one-hot encoded and with a two-level column index
-            y      : DataFrame with the target
-            kind   : Regression to be used for the feature selection, either linear or logistic
-            verbose: Integer level of verbosity
+            X         : DataFrame with the features, one-hot encoded and with a two-level column index
+            y         : DataFrame with the target
+            train_size: fraction of the data that is used for training
+            seed      : random number used to split the data into train/test
+            nbins     : number of bins that numerical features were split into
+            kind      : Regression to be used for the feature selection, either linear or logistic
+            verbose   : Integer level of verbosity
         """
         assert self.k <= len(X.columns.levels[0]), "the given dataset has less than k features"
+
+        # Store the data attributes
+        self.train_size = train_size
+        self.seed = seed
+        self.nbins = nbins
 
         ## Step 1. Select k features
         if verbose >= 2: print("Selecting", self.k, "features...")
@@ -297,6 +310,24 @@ class SRR(RoundedWeightClassifier):
         print(f"Loaded SRR model from {model_path}")
         return model
 
+
+    def get_hyper_parameters(self):
+        """
+        Returns the hyper parameters of the model
+        Returns:
+            a dictionary with the hyper-parameters of the model
+        """
+        return {
+            'k': self.k,
+            'M': self.M,
+            'train_size': self.train_size,
+            'seed': self.seed,
+            'nbins': self.nbins,
+            'cv': self.cv,
+            'Cs': self.Cs,
+            'max_iter': self.max_iter,
+            'random_state': self.random_state
+        }
 
 
 class RoundedLogisticRegression(RoundedWeightClassifier):
