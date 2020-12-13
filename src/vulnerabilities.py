@@ -578,9 +578,9 @@ def poisoning_attack_drop_columns(original_srr, X_train, y_train,
         removals = []
 
         # Stop when there are only k features remaining, or if we achieved the goal before
-        while len(removals) < n - k - 1:
+        while len(removals) < n - k:
             # Instantiate DataFrame to put results in
-            res = pd.DataFrame(dtype=float, columns=[col, 'M'])
+            res = pd.DataFrame(dtype=float, columns=['col', 'M'])
 
             for column in tqdm(X_train.drop(columns=removals+[feature]).columns, leave=False):
                 X_reduced = X_train.drop(columns=removals+[column])
