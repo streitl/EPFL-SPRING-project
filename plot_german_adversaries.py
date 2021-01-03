@@ -1,18 +1,13 @@
 import pandas as pd
-import numpy as np
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
-
-from tqdm import tqdm
 
 from src.loader import load_dataset
 from src.models import SRR
-from src.preprocessing import one_hot_encode, processing_pipeline
-from src.feature_selection import forward_stepwise_regression
+from src.preprocessing import processing_pipeline
 from src.vulnerabilities import find_adversarial_examples
 
 dataset = 'german_credit'
@@ -21,20 +16,15 @@ print(f"-> {dataset} dataset")
 X, y = load_dataset(name=dataset)
 
 # Apply the processing pipeline
-X_train_bin, X_test_bin, y_train, y_test = processing_pipeline(X, y)
-
-
-# One-hot encode the categorical variables
-X_train_one_hot = one_hot_encode(X_train_bin)
-X_test_one_hot = one_hot_encode(X_test_bin)
+X_train, X_test, y_train, y_test = processing_pipeline(X, y)
 
 # Construct and train Select-Regress-Round model
 model = SRR(k=3, M=5)
-model.fit(X_train_one_hot, y_train, verbose=False)
+model.fit(X_train, y_train, verbose=False)
 
 # Show statistics of the model
-train_acc = accuracy_score(y_train, model.predict(X_train_one_hot)) * 100
-test_acc = accuracy_score(y_test, model.predict(X_test_one_hot)) * 100
+train_acc = accuracy_score(y_train, model.predict(X_train)) * 100
+test_acc = accuracy_score(y_test, model.predict(X_test)) * 100
 baseline = max(1-y.mean(), y.mean()) * 100
 print(f"Training accuracy of {train_acc:.1f} % and test accuracy of {test_acc:.1f} % (baseline {baseline:.1f} %)\n")
 print(model.df)
@@ -61,7 +51,7 @@ history_mapping = {
 }
 
 
-adversaries = find_adversarial_examples(model, X_train_bin, y_train, ['Duration_in_months'], unit_changes=True)
+adversaries = find_adversarial_examples(model, X_train, y_train, ['Duration_in_months'], unit_changes=True)
 
 can_change = 'Duration_in_months'
 others = list(model.df.index.levels[0])
@@ -107,7 +97,7 @@ plt.show()
 
 
 
-train = X_train_bin.copy()
+train = X_train.copy()
 train['label'] = y_train
 
 ax = sns.catplot(x='label', y='amount',

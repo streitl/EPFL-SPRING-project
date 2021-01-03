@@ -1,13 +1,11 @@
-import sys
-
 import pandas as pd
 import numpy as np
 
 from tqdm import tqdm
 from itertools import product, combinations, chain
 
-from .preprocessing import one_hot_encode, processing_pipeline, train_srr
-from .models import SRR, RoundedLogisticRegression, SRRWithoutCrossValidation
+from .preprocessing import one_hot_encode, processing_pipeline
+from .models import SRR, RoundedLogisticRegression, SRRWithoutCrossValidation, train_srr
 
 
 def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, allow_nan=True):
@@ -57,7 +55,7 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
     potential_adversaries = pd.DataFrame(columns=correctly_classified.columns)
     
     # Iterate over correctly classified points
-    for index, data in tqdm(correctly_classified.iterrows(), total=correctly_classified.shape[0]):
+    for index, data in tqdm(correctly_classified.iterrows(), total=correctly_classified.shape[0], leave=False):
         
         # Go through precomputed tuples of feature changes
         for change_cols, change_vals in possible_changes:
@@ -69,7 +67,7 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
     
     # Get the model prediction for the adversaries
     potential_adversaries['label~new'] = srr_model.predict(
-        one_hot_encode(potential_adversaries.drop(columns=['label~original']))
+        potential_adversaries.drop(columns=['label~original'])
     )
     
     # Only keep those which changed the prediction label
@@ -86,6 +84,11 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
     adversaries_and_originals.columns = pd.MultiIndex.from_tuples(
         [col.split("~")[::-1] for col in adversaries_and_originals.columns]
     )
+
+    # Show the proportion of correctly classified points for which there were adversarial examples
+    found = len(adversaries_and_originals.index.unique())
+    total = len(correctly_classified.index.unique())
+    print(f'Found adversarial examples for {100 * found / total:.2f} % of the correctly classified points')
     
     # Sort the column names to get a more compact view
     return adversaries_and_originals.reindex(sorted(adversaries_and_originals.columns), axis=1)
@@ -357,7 +360,7 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
             else:
                 model = SRR.copy_params(srr)
             try:
-                model.fit(one_hot_encode(X_no_i), y_no_i)
+                model.fit(X_no_i, y_no_i)
             except ValueError:
                 # This error happens when there are no samples of some class in the training set
                 # In this case, we break the loop
@@ -385,7 +388,7 @@ def poisoning_attack_point_removal(original_srr, X_train, y_train,
 
         # Train SRR model on the new reduced dataset to see if the goal was achieved
         srr = SRR.copy_params(original_srr)
-        srr.fit(one_hot_encode(X_base), y_base)
+        srr.fit(X_base, y_base)
 
         # Check if we have achieved our goal, and if so, return list of removals
         if goal_is_achieved(original_srr, srr, feature, category, goal):
@@ -497,7 +500,7 @@ def poisoning_attack_hyperparameters(original_srr, X, y,
 
             for cv, Cs, m_i, r_s in product(cv_list, Cs_list, max_iter_list, random_state_list):
                 srr = SRR(k=original_srr.k, M=original_srr.M, cv=cv, Cs=Cs, max_iter=m_i, random_state=r_s)
-                srr.fit(one_hot_encode(X_train), y_train)
+                srr.fit(X_train, y_train)
 
                 if goal_is_achieved(original_srr, srr, feature, category, goal):
                     params = {'k': srr.k, 'M': srr.M, 'train_size': train_size, 'seed': seed, 'nbins': nbins,
@@ -587,7 +590,7 @@ def poisoning_attack_drop_columns(original_srr, X_train, y_train,
 
                 # Fit SRR on the training set without the new colums
                 srr = SRR.copy_params(original_srr)
-                srr.fit(one_hot_encode(X_reduced), y_train)
+                srr.fit(X_reduced, y_train)
 
                 # If the goal is achieved, stop
                 if goal_is_achieved(original_srr, srr, feature, category, goal):
@@ -638,7 +641,7 @@ def poisoning_attack_drop_columns(original_srr, X_train, y_train,
                 removals = list(removals)
 
             srr = SRR.copy_params(original_srr)
-            srr.fit(one_hot_encode(X_train.drop(columns=removals)), y_train)
+            srr.fit(X_train.drop(columns=removals), y_train)
 
             if goal_is_achieved(original_srr, srr, feature, category, goal):
                 print(f'Achieved goal! Resulting model:\n{srr}')

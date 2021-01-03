@@ -3,7 +3,6 @@ import numpy as np
 
 import pickle
 
-
 from sklearn.utils._testing import ignore_warnings
 from sklearn.exceptions import ConvergenceWarning
 
@@ -12,6 +11,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import accuracy_score
 
 from .feature_selection import forward_stepwise_regression
+from .preprocessing import one_hot_encode, processing_pipeline
 
 
 class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
@@ -81,7 +81,7 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
         Predicts the label of each input sample.
 
         Args:
-            X: DataFrame with the features, one-hot encoded and with a two-level column index
+            X: DataFrame with the features
             M: Amplitude of the weights, acts as a selector for the corresponding column in the model.
                 If None, the value given to the constructor of the model is used.
 
@@ -95,13 +95,16 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
             assert M > 0, "M must be positive"
             assert M <= 10, "M must be reasonably small"
 
+        # 1-hot encode the features
+        X_hot = one_hot_encode(X)
+
         # Initialize a numpy array of zeros with size the number of samples in X
         n_rows = len(X.index)
         predictions = np.zeros(n_rows)
 
         # Add the weight of each feature present both in the model and in X
-        for feature in self.df.index.intersection(X.columns):
-            predictions += X[feature] * self.df.loc[feature, M]
+        for feature in self.df.index.intersection(X_hot.columns):
+            predictions += X_hot[feature] * self.df.loc[feature, M]
         # Add the bias
         predictions += self.df.loc[('bias', ''), M]
 
@@ -156,9 +159,9 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
                f"\n\n" \
                f"{self.df[self.M].drop(('bias', '')).reset_index().rename(columns={self.M: 'Score'}).to_string(index=False)}" \
                f"\n\n" \
-               f"Model's bias: {self.df.loc[('bias', ''), self.M]:.0f}" \
+               f"Intercept: {self.df.loc[('bias', ''), self.M]:.0f}" \
                f"\n\n" \
-               f"Predict class 1 if sum of scores and bias is >= 0, otherwise predict 0."
+               f"Predict class 1 if sum of scores and intercept is >= 0, otherwise predict 0."
 
 
 class SRR(RoundedWeightClassifier):
@@ -238,7 +241,7 @@ class SRR(RoundedWeightClassifier):
         At the end, the trained model is stored and represented in self.df
         
         Args:
-            X         : DataFrame with the features, one-hot encoded and with a two-level column index
+            X         : DataFrame with the categorical features
             y         : DataFrame with the target
             train_size: fraction of the data that is used for training
             seed      : random number used to split the data into train/test
@@ -246,31 +249,34 @@ class SRR(RoundedWeightClassifier):
             kind      : Regression to be used for the feature selection, either linear or logistic
             verbose   : Integer level of verbosity
         """
-        assert self.k <= len(X.columns.levels[0]), "the given dataset has less than k features"
+        assert self.k <= len(X.columns), "the given dataset has less than k features"
 
         # Store the data attributes
         self.train_size = train_size
         self.seed = seed
         self.nbins = nbins
 
+        # 1-hot encode the features
+        X_hot = one_hot_encode(X)
+
         ## Step 1. Select k features
         if verbose >= 2: print("Selecting", self.k, "features...")
-        self.features = forward_stepwise_regression(X, y, self.k, verbose=verbose, kind=kind)
+        self.features = forward_stepwise_regression(X_hot, y, self.k, verbose=verbose, kind=kind)
         if verbose: print("Selected features", ', '.join(self.features))
 
 
         ## Step 2. Train L1-regularized logistic regression model
         if verbose >= 2: print("Cross-validating the logistic regression model...")
         # Fit inner logistic regression model with cross-validation and L1-regularization
-        self.inner_model.fit(X[self.features], y)
+        self.inner_model.fit(X_hot[self.features], y)
         if verbose:
-            acc = accuracy_score(y, self.inner_model.predict(X[self.features])) * 100
+            acc = accuracy_score(y, self.inner_model.predict(X_hot[self.features])) * 100
             baseline = max(y.mean(), 1-y.mean()) * 100
             print(f"Logistic model accuracy of {acc:.1f} % on the training set (baseline {baseline:.1f} %)")
 
 
         ## Step 3. Rescale and round the model weights
-        self.build_df_of_rounded_weights(X)
+        self.build_df_of_rounded_weights(X_hot)
         if verbose >= 2: print("Done!")
 
 
@@ -392,10 +398,13 @@ class RoundedLogisticRegression(RoundedWeightClassifier):
             X: DataFrame with the features, one-hot encoded and with a two-level column index
             y: DataFrame with the target
         """
+        # 1-hot encode the features
+        X_hot = one_hot_encode(X)
+
         # Step 1. Fit Logistic Regression model (no cross-validation)
-        self.inner_model.fit(X[self.features], y)
+        self.inner_model.fit(X_hot[self.features], y)
         # Step 2. Rescale and round the weights
-        self.build_df_of_rounded_weights(X)
+        self.build_df_of_rounded_weights(X_hot)
 
 
 
@@ -456,12 +465,39 @@ class SRRWithoutCrossValidation(RoundedWeightClassifier):
         Similar to SRR's training procedure but without cross-validation.
 
         Args:
-            X: DataFrame with the features, one-hot encoded and with a two-level column index
+            X: DataFrame with the categorical features
             y: DataFrame with the target
         """
+        # 1-hot encode the features
+        X_hot = one_hot_encode(X)
+
         # Step 1. Select k features with forward stepwise regression
-        self.features = forward_stepwise_regression(X, y, self.k)
+        self.features = forward_stepwise_regression(X_hot, y, self.k)
         # Step 2. Fit logistic regression model
-        self.inner_model.fit(X[self.features], y)
+        self.inner_model.fit(X_hot[self.features], y)
         # Step 3. Rescale and round the inner model weights
-        self.build_df_of_rounded_weights(X)
+        self.build_df_of_rounded_weights(X_hot)
+
+
+def train_srr(X, y, params):
+    """
+    Applies the entire preprocessing pipeline on the data, trains an SRR model with the given parameters and returns it.
+
+    Args:
+        X     : DataFrame with the features, not pre-processed
+        y     : Series with the labels
+        params: dictionary of parameters for the preprocessing and the model
+
+    Returns:
+        srr: an SRR model trained on the data
+    """
+
+    X_train, X_test, y_train, y_test = processing_pipeline(X, y, train_size=params['train_size'],
+                                                           seed=params['seed'], nbins=params['nbins'])
+
+    srr = SRR(k=params['k'], M=params['M'],
+              cv=params['cv'], Cs=params['Cs'], max_iter=params['max_iter'], random_state=params['random_state'])
+    srr.fit(one_hot_encode(X_train), y_train,
+            train_size=params['train_size'], seed=params['seed'], nbins=params['nbins'])
+
+    return srr
