@@ -164,6 +164,20 @@ class RoundedWeightClassifier(BaseEstimator, ClassifierMixin):
                f"Predict class 1 if sum of scores and intercept is >= 0, otherwise predict 0."
 
 
+    def show_scoring_table(self, non_zero=True):
+        simple_df = self.df[self.M].drop(('bias', '')).reset_index().rename(columns={self.M: 'Score'})
+        if non_zero:
+            simple_df = simple_df[simple_df['Score'] != 0]
+
+        print(f"{self.name()} [k={len(self.features)}, M={self.M}]"
+              f"\n\n"
+              f"{simple_df.to_string(index=False)}"
+              f"\n\n"
+              f"Intercept: {self.df.loc[('bias', ''), self.M]:.0f}"
+              f"\n\n"
+              f"Predict class 1 if sum of scores and intercept is >= 0, otherwise predict 0.")
+
+
 class SRR(RoundedWeightClassifier):
     """
     An sklearn BaseEstimator implementing the Select-Regress-Round model.
@@ -497,7 +511,6 @@ def train_srr(X, y, params):
 
     srr = SRR(k=params['k'], M=params['M'],
               cv=params['cv'], Cs=params['Cs'], max_iter=params['max_iter'], random_state=params['random_state'])
-    srr.fit(one_hot_encode(X_train), y_train,
-            train_size=params['train_size'], seed=params['seed'], nbins=params['nbins'])
+    srr.fit(X_train, y_train, train_size=params['train_size'], seed=params['seed'], nbins=params['nbins'])
 
     return srr

@@ -5,7 +5,7 @@ import numpy as np
 
 import src.vulnerabilities as vul
 from src.models import SRR
-from src.preprocessing import one_hot_encode, bin_features
+from src.preprocessing import bin_features
 
 def mock_dataset():
     X = pd.DataFrame(columns=['humidity', 'wind_speed'])
@@ -23,8 +23,9 @@ class TestVulnerabilities(unittest.TestCase):
         X, y = mock_dataset()
 
         model = SRR(k=1, M=2, cv=2, Cs=100)
-        model.fit(one_hot_encode(X), y)
-        print(model)
+        model.fit(X, y)
+
+        model.show_scoring_table()
 
         adversaries = vul.find_adversarial_examples(model, X, y, can_change=['wind_speed'], unit_changes=True)
 
@@ -35,7 +36,7 @@ class TestVulnerabilities(unittest.TestCase):
         X, y = mock_dataset()
 
         model = SRR(k=1, M=2, cv=2, Cs=100)
-        model.fit(one_hot_encode(X), y)
+        model.fit(X, y)
 
         self.assertTrue(vul.binned_features_pass_monotonicity(model, X, y))
 
@@ -44,7 +45,7 @@ class TestVulnerabilities(unittest.TestCase):
         X, y = mock_dataset()
         removals = [1, 3, 6, 10]
         model = SRR(k=1, M=2, cv=2, Cs=100)
-        model.fit(one_hot_encode(X.drop(removals)), y.drop(removals))
+        model.fit(X.drop(removals), y.drop(removals))
 
         self.assertTrue(vul.binned_features_pass_monotonicity(model, X, y))
 
@@ -55,7 +56,7 @@ class TestVulnerabilities(unittest.TestCase):
         X_binned, _ = bin_features(X, X, nbins=3)
 
         model = SRR(k=1, M=2, cv=2, Cs=100)
-        model.fit(one_hot_encode(X_binned), y)
+        model.fit(X_binned, y)
 
         self.assertRaises(ValueError, vul.poisoning_attack_point_removal, model, X_binned, y,
                           'wind_speed', 'H', goal='flip_sign')
@@ -67,13 +68,13 @@ class TestVulnerabilities(unittest.TestCase):
         X, y = mock_dataset()
 
         model = SRR(k=1, M=2, cv=2, Cs=100)
-        model.fit(one_hot_encode(X), y)
+        model.fit(X, y)
 
         for cat in ['H', 'S']:
             removals = vul.poisoning_attack_point_removal(model, X, y, 'wind_speed', cat, goal='nullify', use_stats=True)
 
             poisoned = SRR.copy_params(model)
-            poisoned.fit(one_hot_encode(X.drop(removals)), y.drop(removals))
+            poisoned.fit(X.drop(removals), y.drop(removals))
 
             self.assertEqual(poisoned.get_weight('wind_speed', cat), 0)
 
@@ -82,12 +83,12 @@ class TestVulnerabilities(unittest.TestCase):
         X, y = mock_dataset()
 
         model = SRR(k=1, M=2, cv=2, Cs=100)
-        model.fit(one_hot_encode(X), y)
+        model.fit(X, y)
 
         removals = vul.poisoning_attack_point_removal(model, X, y, 'wind_speed', goal='remove_feature')
 
         poisoned = SRR.copy_params(model)
-        poisoned.fit(one_hot_encode(X.drop(removals)), y.drop(removals))
+        poisoned.fit(X.drop(removals), y.drop(removals))
 
         self.assertTrue(np.isnan(poisoned.get_weight('wind_speed', '')))
 

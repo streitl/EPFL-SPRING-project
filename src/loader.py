@@ -285,24 +285,27 @@ def load_ieeecis():
                               usecols=['TransactionID', 'TransactionAmt', 'card4',
                                        'card6', 'addr2', 'dist1', 'isFraud'],
                               dtype={'addr2': 'category'})
-    
+
     ## Processing
+    # Replace column names to more understandable ones
+    identity = identity.rename(columns={'id_31': 'browser', 'id_30': 'OS'})
+    transaction = transaction.rename(columns={'card6': 'card_type',})
     # Remove version number from browser info
-    identity.id_31 = identity.id_31.str.replace(' ?[0-9]+(.[0-9]+)?', '')
+    identity.browser = identity.browser.str.replace(' ?[0-9]+(.[0-9]+)?', '')
     # Also remove the word generic (helps merging some groups)
-    identity.id_31 = identity.id_31.str.replace(' ?generic', '')
+    identity.browser = identity.browser.str.replace(' ?generic', '')
     # Only keep frequent values, turn the others into 'other'
-    id_31_counts = identity.id_31.value_counts(dropna=False)
-    identity.id_31 = identity.id_31.map(lambda i: i if id_31_counts[i] > 200 else 'other')
+    browser_counts = identity.browser.value_counts(dropna=False)
+    identity.browser = identity.browser.map(lambda i: i if browser_counts[i] > 200 else 'other')
 
     # Remove version number from OS info
-    identity.id_30 = identity.id_30.str.replace(' ?[0-9]+([._][0-9]+){0,2}', '')
+    identity.OS = identity.OS.str.replace(' ?[0-9]+([._][0-9]+){0,2}', '')
     
     # We need the joined result
     combined_df = pd.merge(transaction, identity, on="TransactionID", how="left")
     combined_df.set_index('TransactionID', inplace=True)
-    combined_df.id_30.fillna('unknown', inplace=True)
-    combined_df.id_31.fillna('unknown', inplace=True)
+    combined_df.OS.fillna('unknown', inplace=True)
+    combined_df.browser.fillna('unknown', inplace=True)
     
     # Divide into features and label
     X = combined_df.drop(columns=["isFraud"])

@@ -18,7 +18,7 @@ model = SRR(k=3, M=3)
 model.fit(X_train, y_train, verbose=True)
 
 # Show model
-print("SRR model:", model.df, "", sep='\n\n')
+srr.show_scoring_table()
 
 # Show statistics of the model
 train_acc = accuracy_score(y_train, model.predict(X_train)) * 100

@@ -4,11 +4,11 @@ import numpy as np
 from tqdm import tqdm
 from itertools import product, combinations, chain
 
-from .preprocessing import one_hot_encode, processing_pipeline
+from .preprocessing import processing_pipeline
 from .models import SRR, RoundedLogisticRegression, SRRWithoutCrossValidation, train_srr
 
 
-def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, allow_nan=True):
+def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, allow_nan=True, verbose=True):
     """
     Given an SRR model, data points, and the features which can be changed, produces a list of 
     adversarial examples that have changed the model prediction label.
@@ -20,6 +20,7 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
         can_change  : List with features in X that we can modify
         unit_changes: Boolean indicating whether to change a single feature at a time
         allow_nan   : Boolean indicating whether nans are allowed changes or not
+        verbose     : Boolean indicating whether to show percentage of points for which there were advs
     
     Returns:
         adversaries_and_originals: Dataframe with adversarial examples
@@ -30,7 +31,7 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
     assert len(modifiable_features) > 0, "No features can be modified with the given parameters"
     
     # Create model predictions
-    y_pred = srr_model.predict(one_hot_encode(X))
+    y_pred = srr_model.predict(X)
     
     # Only keep data points whose label was correctly predicted,
     # and only keep the features selected by the SRR model
@@ -85,10 +86,11 @@ def find_adversarial_examples(srr_model, X, y, can_change, unit_changes=False, a
         [col.split("~")[::-1] for col in adversaries_and_originals.columns]
     )
 
-    # Show the proportion of correctly classified points for which there were adversarial examples
-    found = len(adversaries_and_originals.index.unique())
-    total = len(correctly_classified.index.unique())
-    print(f'Found adversarial examples for {100 * found / total:.2f} % of the correctly classified points')
+    if verbose:
+        # Show the proportion of correctly classified points for which there were adversarial examples
+        found = len(adversaries_and_originals.index.unique())
+        total = len(correctly_classified.index.unique())
+        print(f'Found adversarial examples for {100 * found / total:.2f} % of the correctly classified points')
     
     # Sort the column names to get a more compact view
     return adversaries_and_originals.reindex(sorted(adversaries_and_originals.columns), axis=1)
@@ -147,7 +149,7 @@ def binned_features_pass_monotonicity(srr, X, y):
         
     # Look for adversarial examples by changing only the features that are non-monotonic, one at a time
     adversarial_examples = find_adversarial_examples(srr, X, y, can_change=non_monotonic_features,
-                                                     unit_changes=True, allow_nan=False)
+                                                     unit_changes=True, allow_nan=False, verbose=False)
     
     if adversarial_examples.shape[0] > 0:
         return False

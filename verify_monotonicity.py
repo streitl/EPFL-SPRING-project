@@ -36,12 +36,12 @@ passed = 0
 print(f"Verifying monotonicity for {args.ntests} different models:")
 for nfold in tqdm(range(args.ntests)):
     
-    X_train_bin, X_test_bin, y_train, y_test = processing_pipeline(X, y, seed=nfold)
+    X_train, X_test, y_train, y_test = processing_pipeline(X, y, seed=nfold)
 
     model = SRR(k=args.k, M=args.M)
-    model.fit(one_hot_encode(X_train_bin), y_train, verbose=False)
+    model.fit(X_train, y_train, verbose=False)
     
-    passed += int(binned_features_pass_monotonicity(model, X_train_bin, y_train))
+    passed += int(binned_features_pass_monotonicity(model, X_train, y_train))
 
 print("{}: {:.1f} % passed monotonicity check".format(args.dataset, 100 * passed / args.ntests))
 
