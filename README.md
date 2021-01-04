@@ -12,23 +12,23 @@ _Note: The model only accepts categorical features, so any numerical features mu
 We test the robustness of the model according to three main criteria:
 - _Adversarial examples_: it is possible to attack the model by performing a realistic change to a datapoint and switching the model's decision?
 - _Monotonicity_: is it possible that the model weights for a feature that was originally numerical are not monotonic and allow the model's decision to be changed?
-- _Poisonining attacks_: is it possible that removing a very small number of samples from the training set results in a different model?
+- _Poisonining attacks_: is it possible that slightly changing the data or parameters of the training procedure results in a model with a desired property?
 
 ### Code structure
 The repository is organised as follows:
 - The folder `src` contains the python source code of the project
   - `feature_selection.py` contains `forward_stepwise_regression`
-  - `loader.py` contains information about the datasets, and more importantly `load_dataset`
-  - `models.py` contains `SRR`, the Select-Regress-Round implementation
+  - `loader.py` contains information about the datasets, and more importantly the function `load_dataset`
+  - `models.py` contains `SRR`, the Select-Regress-Round implementation, as well as two model substitutes, `SRRWithoutCrossValidation` and `RoundedLogisticRegression`
   - `preprocessing.py` contains preprocessing methods, namely `processing_pipeline`
-  - `vulnerabilities.py` contains `find_adversarial_examples`, `poisoning_attack`, and `binned_features_pass_monotonicity`
+  - `vulnerabilities.py` contains `find_adversarial_examples`, `binned_features_pass_monotonicity` and many kinds of `poisoning_attack`
 - The folder `tests` contains one test file per python file in `src`, which tests the functionality of the functions in this file
 - The folder `data` contains the datasets' `.csv` files:
   - There are 21 UCI datasets (retrieved from the repository of the '_Simple Rules for Complex Decisions_' paper)
-  - It is here, in the folders `texas` and `ieeecis`, that you should put the texas and IEEECIS datasets (they are too large)
+  - It is here, in the folders `texas` and `ieeecis`, that you should put the texas and IEEECIS datasets (they are too large for git)
 
-### Scripts
-There are also scripts on the main directory that allow me to verify that I didn't break anything, and also allow to reproduce some results:
+### Scripts and Notebooks
+There are scripts on the main directory and Jupyter Notebooks in `notebooks`, which allow to verify that nothing is broken, and also allow to reproduce some results:
 - `adversaries.py` trains SRR on the given dataset with the specified parameters (or loads a model if it was already trained), looks for adversaries by changing only the specified columns, and outputs the adversarial examples that were found
 - `all_uci_datasets.py` trains SRR on all UCI datasets, and outputs performance metrics for each of them
 - `bankruptcy_monotonicity.py` checks whether SRR trained on `bankruptcy` verifies monotonicity, for many train/test splits
