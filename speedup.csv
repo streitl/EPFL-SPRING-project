@@ -1,0 +1,15 @@
+,model,dataset,speedup,faithfulness
+0,Rounded Logistic Regression,bankruptcy,7.627232441514098,0.9999603174603175
+1,Rounded Logistic Regression,car,17.497176084588734,0.9973357831878713
+2,Rounded Logistic Regression,congress-voting,5.015372105746122,0.9997835923667125
+3,Rounded Logistic Regression,credit-approval,5.920890969544481,0.9998181912627915
+4,Rounded Logistic Regression,dermatology,5.299055314731576,1.0
+5,Rounded Logistic Regression,german_credit,4.821705658409669,0.9879866518353736
+6,Rounded Logistic Regression,mammo,13.94739773792698,0.9821354003724643
+7,SRR Without Cross-Validation,bankruptcy,2.704341460305485,0.9999603174603175
+8,SRR Without Cross-Validation,car,7.271280322751404,0.9973357831878713
+9,SRR Without Cross-Validation,congress-voting,1.5653051136412068,0.9997835923667125
+10,SRR Without Cross-Validation,credit-approval,2.1514280464140683,0.9998181912627915
+11,SRR Without Cross-Validation,dermatology,1.3937285231783496,1.0
+12,SRR Without Cross-Validation,german_credit,1.4101502493967952,0.9974341861327404
+13,SRR Without Cross-Validation,mammo,6.157125482577061,0.9828749302605038
