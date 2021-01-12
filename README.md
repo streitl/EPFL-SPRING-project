@@ -3,16 +3,15 @@
 ## General Information
 This is the repository for the MSc semester project of Luã Streit at the SPRING lab.
 
-The main objective of this project is to see how robust is the model described in __[this paper](https://arxiv.org/abs/1702.04690])__, which we call **Select-Regress-Round** and often abbreviate as **SRR**.
+The main objective of this project is to determine if the interpretable model __[Select-Regress-Round(SRR)](https://arxiv.org/abs/1702.04690])__ is robust and can be trusted
 
-An SRR model takes two main parameters, both integers, which are **k**, the number of features that the model is allowed to use, and **M**, the maximum possible amplitude of the weights.
+SRR takes two main parameters, both integers, which are **k**, the number of features that the model is allowed to use, and **M**, the maximum possible amplitude of the weights.
 
 _Note: The model only accepts categorical features, so any numerical features must first be binned._
 
-We test the robustness of the model according to three main criteria:
-- _Adversarial examples_: it is possible to attack the model by performing a realistic change to a datapoint and switching the model's decision?
-- _Monotonicity_: is it possible that the model weights for a feature that was originally numerical are not monotonic and allow the model's decision to be changed?
-- _Poisonining attacks_: is it possible that slightly changing the data or parameters of the training procedure results in a model with a desired property?
+We test the robustness & manipulability of the model according to 2 main criteria:
+- _Adversarial examples_: Is it possible to attack the model by performing a realistic change to a datapoint and switching the model's decision? In addition, is it possible that the model weights for a feature that was originally numerical are not monotonic and allow adversarial examples?
+- _Poisonining attacks_: Is it possible that slightly changing the data or parameters of the training procedure results in a model with a desired property?
 
 ### Code structure
 The repository is organised as follows:
@@ -28,7 +27,7 @@ The repository is organised as follows:
   - It is here, in the folders `texas` and `ieeecis`, that you should put the texas and IEEECIS datasets (they are too large for git)
 
 ### Scripts and Notebooks
-There are scripts on the main directory and Jupyter Notebooks in `notebooks`, which allow to verify that nothing is broken, and also allow to reproduce some results:
+There are scripts and Jupyter Notebooks on the main directory, which allow to verify that nothing is broken, and also allow to reproduce some results:
 - `adversaries.py` trains SRR on the given dataset with the specified parameters (or loads a model if it was already trained), looks for adversaries by changing only the specified columns, and outputs the adversarial examples that were found
 - `all_uci_datasets.py` trains SRR on all UCI datasets, and outputs performance metrics for each of them
 - `bankruptcy_monotonicity.py` checks whether SRR trained on `bankruptcy` verifies monotonicity, for many train/test splits
