@@ -3,7 +3,7 @@
 ## General Information
 This is the repository for the MSc semester project of Luã Streit at the SPRING lab.
 
-The main objective of this project is to determine if the interpretable model __[Select-Regress-Round(SRR)](https://arxiv.org/abs/1702.04690)__ is robust and can be trusted
+The main objective of this project is to determine if the interpretable model __[Select-Regress-Round(SRR)](https://arxiv.org/abs/1702.04690)__ is robust and can be trusted.
 
 SRR takes two main parameters, both integers, which are **k**, the number of features that the model is allowed to use, and **M**, the maximum possible amplitude of the weights.
 
